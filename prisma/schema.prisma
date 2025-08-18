@@ -1,0 +1,45 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64"]
+}
+
+model Photo {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  storagePath String
+  width       Int
+  height      Int
+  capturedAt  DateTime?
+  caption     String?
+  exifRaw     Json?
+  createdAt   DateTime  @default(now())
+  variants    Variant[]
+  keywords    Keyword[]
+  published   Boolean  @default(false)
+  priceDigitalJPY Int @default(5000)
+}
+
+model Variant {
+  id          String @id @default(uuid())
+  photoId     String
+  type        String
+  width       Int
+  height      Int
+  storagePath String
+  bytes       Int
+  Photo       Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+}
+
+model Keyword {
+  id      String @id @default(uuid())
+  photoId String
+  word    String
+  Photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@index([word])
+}
