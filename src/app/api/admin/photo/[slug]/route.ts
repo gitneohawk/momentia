@@ -18,14 +18,14 @@ async function getContainer() {
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
   try {
-    const { slug } = params;
+    const { slug } = await params;
     const body = await req.json().catch(() => ({}));
 
     // Collect scalar updates
@@ -43,7 +43,7 @@ export async function PATCH(
         .slice(0, 32); // safety cap
       // de-duplicate while preserving order
       const seen = new Set<string>();
-      incomingKeywords = cleaned.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
+      incomingKeywords = cleaned.filter((s: string) => (seen.has(s) ? false : (seen.add(s), true)));
     }
 
     if (!Object.keys(data).length && incomingKeywords === null) {
@@ -83,14 +83,14 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
   try {
-    const { slug } = params;
+    const { slug } = await params;
 
     // 1) DBから対象取得
     const photo = await prisma.photo.findUnique({
