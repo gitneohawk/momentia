@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, Variant, Keyword } from "@prisma/client";
+
 import {
   StorageSharedKeyCredential,
   BlobSASPermissions,
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
 const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
 const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1];
 const KEY = /AccountKey=([^;]+)/i.exec(CONN)?.[1];
+const DB = process.env.DATABASE_URL ?? "";
 
 // 起動時に一度だけ環境チェックを出す（秘密は出さない）
 try {
@@ -29,6 +31,7 @@ try {
   const keyInfo = KEY ? `len:${KEY.length}` : "(none)";
   console.info("[/api/photos] boot env check", {
     hasConn: Boolean(CONN),
+    hasDb: Boolean(DB),
     hasAcc: Boolean(ACC),
     acc: accMasked,
     hasKey: Boolean(KEY),
@@ -94,27 +97,39 @@ export async function GET(req: Request) {
 
   console.info("[/api/photos] request", { q, kw, limit, hasCred: Boolean(credential) });
 
-  const photos = (await prisma.photo.findMany({
-    where: {
-      AND: [
-        { published: true } as any,
-        q
-          ? ({
-              OR: [
-                { caption: { contains: q, mode: "insensitive" } },
-                { slug: { contains: q, mode: "insensitive" } },
-              ],
-            } as any)
-          : ({} as any),
-        kw
-          ? ({ keywords: { some: { word: { equals: kw, mode: "insensitive" } } } } as any)
-          : ({} as any),
-      ],
-    },
-    orderBy: { createdAt: "desc" },
-    include: { variants: true, keywords: true },
-    take: limit,
-  })) as PhotoWithRels[];
+  let photos: PhotoWithRels[] = [];
+  try {
+    photos = (await prisma.photo.findMany({
+      where: {
+        AND: [
+          { published: true } as any,
+          q
+            ? ({
+                OR: [
+                  { caption: { contains: q, mode: "insensitive" } },
+                  { slug: { contains: q, mode: "insensitive" } },
+                ],
+              } as any)
+            : ({} as any),
+          kw
+            ? ({ keywords: { some: { word: { equals: kw, mode: "insensitive" } } } } as any)
+            : ({} as any),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      include: { variants: true, keywords: true },
+      take: limit,
+    })) as PhotoWithRels[];
+  } catch (err) {
+    console.error("[/api/photos] prisma findMany failed", {
+      errMessage: (err as Error)?.message,
+      hasDb: Boolean(DB),
+    });
+    return NextResponse.json(
+      { error: "DB_ERROR", message: "failed to fetch photos" },
+      { status: 500 }
+    );
+  }
 
   console.info("[/api/photos] db result", { count: photos.length });
 
