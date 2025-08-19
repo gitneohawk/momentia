@@ -2,7 +2,7 @@ import NextAuth, { type AuthOptions, type Session } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import type { JWT } from "next-auth/jwt";
 
-const authOptions: AuthOptions = {
+export const authOptions: AuthOptions = {
   providers: [
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
