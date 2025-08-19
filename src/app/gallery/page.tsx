@@ -34,27 +34,6 @@ function useViewportWidth() {
   return w;
 }
 
-// Blur-up image component for nicer loading（未使用だが再利用用に残す）
-function BlurImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
-  const [loaded, setLoaded] = useState(false);
-  return (
-    <img
-      {...props}
-      onLoad={(e) => {
-        setLoaded(true);
-        props.onLoad?.(e);
-      }}
-      className={[
-        "h-full w-full object-cover transition-transform duration-300",
-        loaded ? "blur-0" : "blur-[8px]",
-        props.className ?? "",
-      ].join(" ")}
-      loading={props.loading ?? "lazy"}
-      decoding={props.decoding ?? "async"}
-    />
-  );
-}
-
 export default function GalleryPage() {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);

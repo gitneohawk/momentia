@@ -12,7 +12,7 @@ export const authOptions: AuthOptions = {
   ],
   session: { strategy: "jwt" as const },
   callbacks: {
-    async session({ session, token }: { session: Session; token: JWT }) {
+    async session({ session, token: _token }: { session: Session; token: JWT }) {
       // ここで session.user.email などを整形してもOK
       return session;
     },

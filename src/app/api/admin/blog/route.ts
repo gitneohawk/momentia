@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   try {
     const items = await prisma.post.findMany({
       orderBy: [{ updatedAt: "desc" }],

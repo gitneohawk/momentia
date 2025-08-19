@@ -15,7 +15,7 @@ export async function GET(
     const post = await prisma.post.findUnique({ where: { slug } });
     if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(post);
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -50,8 +50,8 @@ export async function PUT(
   try {
     const updated = await prisma.post.update({ where: { slug }, data: update });
     return NextResponse.json(updated);
-  } catch (e: any) {
-    if (e.code === "P2025") {
+  } catch (_e: any) {
+    if (_e.code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -69,8 +69,8 @@ export async function DELETE(
   try {
     const deleted = await prisma.post.delete({ where: { slug } });
     return NextResponse.json(deleted);
-  } catch (e: any) {
-    if (e.code === "P2025") {
+  } catch (_e: any) {
+    if (_e.code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

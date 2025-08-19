@@ -41,3 +41,27 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# IDE / Editor junk
+.vscode/
+.idea/
+*.swp
+
+# OS junk (Windows)
+Thumbs.db
+Desktop.ini
+
+# Generic logs & temp
+logs/
+*.log
+.tmp/
+temp/
+
+# Storybook / test artifacts (念のため)
+storybook-static/
+cypress/videos/
+cypress/screenshots/
+
+# If you ever use local SQLite for quick protos
+prisma/dev.db
+prisma/dev.db-journal

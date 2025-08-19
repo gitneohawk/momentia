@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 const CONTAINER = "photos";
 const QUALITY = 85;          // 出力JPEG品質
-const MARGIN = 24;           // 端からの余白(px)
+const _MARGIN = 24;           // 端からの余白(px)
 const WM_TEXT = "© Evoluzio Inc. — Preview"; // 透かし文言
-const WM_PLACEMENT: "center" | "bottom-right" = "center";
+const _WM_PLACEMENT: "center" | "bottom-right" = "center";
 
 function svgWatermark(text: string, imgWidth: number) {
   // 半透明の白文字＋わずかな影（視認性重視）
@@ -20,7 +20,7 @@ function svgWatermark(text: string, imgWidth: number) {
   const svgWidth = Math.max(600, Math.min(1200, Math.round(imgWidth * 0.6)));
   const svgHeight = Math.round(fontSize * 1.6);
   return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}">
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" _height="${svgHeight}">
       <style>
         .wm {
           font: ${fontSize}px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -75,7 +75,7 @@ export async function GET(
 
     // 画像を読み、回転補正＋透かし合成＋再圧縮
     const img = sharp(input).rotate();
-    const { width = 0, height = 0 } = await img.metadata();
+    const { width = 0 } = await img.metadata();
     const wm = svgWatermark(WM_TEXT, width || 0);
 
     // 透かしの配置：右下にマージンをとって合成

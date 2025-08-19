@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import Link from "next/link";
 
 type Props = {
   open: boolean;
@@ -54,12 +55,7 @@ export default function ComingSoon({ open, onClose, title, message }: Props) {
           >
             閉じる
           </button>
-          <a
-            href="/purchase/info"
-            className="rounded-lg bg-black px-4 py-2 text-sm text-white hover:bg-neutral-800"
-          >
-            くわしく
-          </a>
+          <Link href="/purchase/info/">詳しく見る</Link>
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import ComingSoon from "@/components/ComingSoon";
+// import ComingSoon from "@/components/ComingSoon";
 
 // アニメーションライブラリのインポート
 import { motion } from "framer-motion";
@@ -119,20 +119,19 @@ export default function Home() {
 
           <div className="-m-2 flex flex-wrap">
             {featured.map((p) => {
-              const src = p.urls.thumb || p.urls.large || p.urls.original;
+                const _src = p.urls.thumb || p.urls.large || p.urls.original;
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">
                   <Link
                     href={`/gallery#${p.slug}`}
                     className="group relative block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 hover:shadow-xl transition-shadow duration-300"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt={p.caption ?? p.slug}
-                      className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
-                      loading="lazy"
-                    />
+                        <img
+                      src={_src}
+                          alt={p.caption ?? p.slug}
+                          className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
+                          loading="lazy"
+                        />
                     {/* ホバー時に表示されるグラデーションオーバーレイ */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     
