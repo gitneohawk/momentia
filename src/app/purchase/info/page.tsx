@@ -11,7 +11,7 @@ export default function PurchaseInfo() {
         <li>額装オプション</li>
       </ul>
       <p className="text-gray-600">
-        特別なご要望がございましたら、お気軽にお問い合わせください。
+        特別なご要望がございましたら、お気軽にお問い合わせくださいませ。
       </p>
     </section>
   )
