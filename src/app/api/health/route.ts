@@ -1,7 +1,7 @@
 // src/app/api/health/route.ts
 import { NextResponse } from "next/server";
 import { BlobServiceClient } from "@azure/storage-blob";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
