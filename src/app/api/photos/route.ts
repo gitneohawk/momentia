@@ -8,6 +8,13 @@ import {
   generateBlobSASQueryParameters,
 } from "@azure/storage-blob";
 
+// ---- debug logging helpers (non-secret) ----
+function mask(s?: string | null, showPrefix = 3) {
+  if (!s) return "(none)";
+  if (s.length <= showPrefix) return `${s}***`;
+  return `${s.slice(0, showPrefix)}***`;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -16,16 +23,38 @@ const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
 const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1];
 const KEY = /AccountKey=([^;]+)/i.exec(CONN)?.[1];
 
-if (!ACC || !KEY) {
-  // 起動時に環境変数が無いと 500 になるため、ログを残す
-  console.warn("[/api/photos] Missing AZURE_STORAGE_CONNECTION_STRING (AccountName/AccountKey).");
+// 起動時に一度だけ環境チェックを出す（秘密は出さない）
+try {
+  const accMasked = mask(ACC);
+  const keyInfo = KEY ? `len:${KEY.length}` : "(none)";
+  console.info("[/api/photos] boot env check", {
+    hasConn: Boolean(CONN),
+    hasAcc: Boolean(ACC),
+    acc: accMasked,
+    hasKey: Boolean(KEY),
+    key: keyInfo,
+    nodeEnv: process.env.NODE_ENV,
+  });
+  if (!ACC || !KEY) {
+    console.warn("[/api/photos] Missing AZURE_STORAGE_CONNECTION_STRING (AccountName/AccountKey).");
+  }
+} catch (e) {
+  console.error("[/api/photos] env check logging failed", e);
 }
 
 const credential = ACC && KEY ? new StorageSharedKeyCredential(ACC, KEY) : null;
 const container = "photos";
 
 function signedUrl(storagePath: string, ttlMinutes = 15): string {
-  if (!credential || !ACC) return ""; // 環境未設定時は空文字で返す（呼び出し側で null 判定可）
+  if (!credential || !ACC) {
+    // 生成不能時は空文字返却。呼び出し側で null 判定可。
+    // 過度なログを避けるため、最初の数回のみ通知。
+    if ((globalThis as any).__photosSignedUrlWarned__ !== true) {
+      (globalThis as any).__photosSignedUrlWarned__ = true;
+      console.warn("[/api/photos] signedUrl disabled (no credential). Returning empty URL.");
+    }
+    return "";
+  }
 
   const now = new Date();
   const startsOn = new Date(now.getTime() - 60 * 1000); // クロックスキュー吸収のため -1min
@@ -50,6 +79,7 @@ function signedUrl(storagePath: string, ttlMinutes = 15): string {
 type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }>;
 
 export async function GET(req: Request) {
+  const t0 = Date.now();
   // Robust URL parsing (CI/prerender safety)
   let searchParams: URLSearchParams;
   try {
@@ -61,6 +91,8 @@ export async function GET(req: Request) {
   const q = searchParams.get("q")?.trim();
   const kw = searchParams.get("keyword")?.trim();
   const limit = Math.min(Number(searchParams.get("limit") ?? 100), 200);
+
+  console.info("[/api/photos] request", { q, kw, limit, hasCred: Boolean(credential) });
 
   const photos = (await prisma.photo.findMany({
     where: {
@@ -84,9 +116,17 @@ export async function GET(req: Request) {
     take: limit,
   })) as PhotoWithRels[];
 
+  console.info("[/api/photos] db result", { count: photos.length });
+
+  let missingThumb = 0;
+  let missingLarge = 0;
+
   const items = photos.map((p) => {
     const thumb = p.variants.find((v: Variant) => v.type === "thumb");
     const large = p.variants.find((v: Variant) => v.type === "large");
+
+    if (!thumb) missingThumb++;
+    if (!large) missingLarge++;
 
     return {
       slug: p.slug,
@@ -103,6 +143,9 @@ export async function GET(req: Request) {
       },
     };
   });
+
+  const ms = Date.now() - t0;
+  console.info("[/api/photos] response summary", { items: items.length, missingThumb, missingLarge, ms });
 
   return NextResponse.json({ items }, { headers: { "Cache-Control": "no-store" } });
 }
