@@ -1,0 +1,123 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type Item = {
+  slug: string;
+  width: number;
+  height: number;
+  caption: string | null;
+  capturedAt: string | null;
+  keywords: string[];
+  urls: { thumb: string | null; large: string | null; original: string };
+};
+
+export default function Home() {
+  const [featured, setFeatured] = useState<Item[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      // Try to fetch featured photos first
+      let res = await fetch("/api/photos?featured=1&limit=3", { cache: "no-store" });
+      let json = await res.json();
+      let items: Item[] = json.items ?? [];
+      if (!items.length) {
+        res = await fetch("/api/photos?limit=3", { cache: "no-store" });
+        json = await res.json();
+        items = json.items ?? [];
+      }
+      setFeatured(items.slice(0, 3));
+    })();
+  }, []);
+
+  return (
+    <main className="min-h-dvh bg-neutral-50">
+      {/* Hero */}
+      <section className="relative mx-auto max-w-6xl px-4 sm:px-6 py-20 mb-12 md:mb-16">
+        {/* 背景グレイン（薄め） */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: "url(/textures/grain.png)",
+            backgroundSize: "300px 300px",
+            mixBlendMode: "multiply",
+          }}
+        />
+        <div className="relative">
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-neutral-900">
+            Momentia
+          </h1>
+          <p className="mt-4 text-lg md:text-xl text-neutral-600 max-w-2xl">
+            光と時間の呼吸を、そっと額に。—— 静けさを連れてくる写真たち。
+          </p>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/gallery"
+              className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-4 py-2 text-neutral-900 shadow-sm hover:shadow transition"
+            >
+              ギャラリーを見る
+            </Link>
+            <Link
+              href="/purchase/info"
+              className="inline-flex items-center rounded-md px-4 py-2 bg-neutral-900 text-white hover:bg-neutral-800 transition"
+            >
+              ご購入について
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Works */}
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-20">
+        <header className="mb-6 flex items-end justify-between">
+          <h2 className="text-xl font-medium text-neutral-900">Featured Works</h2>
+        </header>
+
+        <div className="-m-2 flex flex-wrap">
+          {featured.map((p) => {
+            const src = p.urls.thumb || p.urls.large || p.urls.original;
+            return (
+              <div key={p.slug} className="w-full md:w-1/3 p-2">
+                <Link
+                  href={`/gallery#${p.slug}`}
+                  className="group relative block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 hover:shadow-md transition"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={p.caption ?? p.slug}
+                    className="h-64 md:h-72 w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 p-4">
+                    <p className="text-white text-base font-medium drop-shadow">{p.caption || "—"}</p>
+                  </div>
+                </Link>
+              </div>
+            );
+          })}
+          {featured.length === 0 && (
+            <div className="text-neutral-500">注目の作品はまだありません。</div>
+          )}
+        </div>
+      </section>
+
+      {/* Powered by Evoluzio */}
+      <footer className="border-t border-neutral-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 flex items-center justify-between">
+          <p className="text-sm text-neutral-600">
+            © {new Date().getFullYear()} Momentia
+          </p>
+          <div className="flex items-center gap-2 text-sm text-neutral-600">
+            <span className="opacity-70">Powered by</span>
+            <img src="/logos/Evoluzio_Logo.png" alt="Evoluzio Inc." className="h-5 w-auto opacity-80" />
+          </div>
+        </div>
+      </footer>
+    </main>
+  );
+}

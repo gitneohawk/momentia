@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 
 type Item = {
@@ -8,15 +8,87 @@ type Item = {
   width: number;
   height: number;
   caption?: string | null;
+  keywords: string[];
   published: boolean;
   priceDigitalJPY: number | null; // ← 追加
   urls: { thumb: string | null; large: string | null; original: string };
 };
 
+function TagEditor({
+  value,
+  suggestions,
+  onChange,
+  disabled,
+}: {
+  value: string[];
+  suggestions: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+}) {
+  const [input, setInput] = useState("");
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
+
+  const add = (raw: string) => {
+    const t = norm(raw);
+    if (!t) return;
+    if (!value.includes(t)) onChange([...value, t]);
+    setInput("");
+  };
+  const remove = (t: string) => onChange(value.filter((v) => v !== t));
+
+  const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
+      e.preventDefault();
+      add(input);
+    }
+  };
+
+  const listId = "tag-suggest-list";
+  const uniqSugs = Array.from(new Set(suggestions)).filter((s) => !value.includes(s));
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {value.map((t) => (
+        <span key={t} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 border px-2 py-0.5 text-xs">
+          {t}
+          <button
+            type="button"
+            onClick={() => remove(t)}
+            disabled={disabled}
+            className="text-neutral-500 hover:text-neutral-800"
+            aria-label={`${t} を削除`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <input
+        list={listId}
+        value={input}
+        onChange={(e) => setInput(e.currentTarget.value)}
+        onKeyDown={onKeyDown}
+        disabled={disabled}
+        placeholder="タグを追加… (Enter)"
+        className="min-w-[10rem] flex-1 border rounded px-2 py-1 text-sm"
+      />
+      <datalist id={listId}>
+        {uniqSugs.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
 export default function AdminManagePage() {
   const { status } = useSession();
 
   const [items, setItems] = useState<Item[]>([]);
+  const allTagSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) for (const k of it.keywords || []) set.add(k);
+    return Array.from(set).sort();
+  }, [items]);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -27,7 +99,11 @@ export default function AdminManagePage() {
       const raw = await res.text();
       const json = raw ? JSON.parse(raw) : null;
       if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-      setItems((json?.items ?? []) as Item[]);
+      const arr = (json?.items ?? []).map((x: any) => ({
+        ...x,
+        keywords: Array.isArray(x?.keywords) ? x.keywords : [],
+      }));
+      setItems(arr as Item[]);
     } catch (err: any) {
       setItems([]);
       setMsg(err?.message || String(err));
@@ -78,6 +154,22 @@ export default function AdminManagePage() {
     if (res.ok) {
       setItems((prev) => prev.map((p) => (p.slug === slug ? { ...p, priceDigitalJPY: price } : p)));
     }
+  };
+
+  const saveTags = async (slug: string, tags: string[]) => {
+    setBusy(slug);
+    const res = await fetch(`/api/admin/photo/${slug}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keywords: tags }),
+    });
+    setBusy(null);
+    if (!res.ok) {
+      setMsg("Tag update failed");
+      return;
+    }
+    setMsg("Tags saved");
+    setItems((prev) => prev.map((p) => (p.slug === slug ? { ...p, keywords: tags } : p)));
   };
 
   const remove = async (slug: string) => {
@@ -155,6 +247,17 @@ export default function AdminManagePage() {
                   if (v !== (it.caption ?? "")) saveCaption(it.slug, v);
                 }}
               />
+
+              {/* タグ（カテゴリ） */}
+              <div className="grid gap-1">
+                <label className="text-sm text-neutral-600">Tags</label>
+                <TagEditor
+                  value={it.keywords || []}
+                  suggestions={allTagSuggestions}
+                  disabled={busy === it.slug}
+                  onChange={(next) => saveTags(it.slug, next)}
+                />
+              </div>
 
               {/* 価格（JPY） */}
               <div className="flex items-center gap-2">

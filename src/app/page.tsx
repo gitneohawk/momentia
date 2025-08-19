@@ -1,89 +1,194 @@
 "use client";
 
+// Next.js & React のインポート
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import ComingSoon from "@/components/ComingSoon";
 
-type HeroItem = {
+// アニメーションライブラリのインポート
+import { motion } from "framer-motion";
+
+// 型定義
+type Item = {
   slug: string;
   width: number;
   height: number;
-  caption?: string | null;
-  urls: { original: string; large: string | null; thumb: string | null };
+  caption: string | null;
+  capturedAt: string | null;
+  keywords: string[];
+  urls: { thumb: string | null; large: string | null; original: string };
 };
 
 export default function Home() {
-  const [hero, setHero] = useState<HeroItem | null>(null);
+  const [featured, setFeatured] = useState<Item[]>([]);
 
   useEffect(() => {
-    let alive = true;
     (async () => {
-      try {
-        const res = await fetch("/api/photos", { cache: "no-store" });
-        const json = await res.json().catch(() => null);
-        const first: HeroItem | undefined = json?.items?.[0];
-        if (alive && first) setHero(first);
-      } catch {}
+      // APIからおすすめの写真を取得
+      let res = await fetch("/api/photos?featured=1&limit=3", { cache: "no-store" });
+      let json = await res.json();
+      let items: Item[] = json.items ?? [];
+      // おすすめ写真がない場合は、最新の写真を3枚取得
+      if (!items.length) {
+        res = await fetch("/api/photos?limit=3", { cache: "no-store" });
+        json = await res.json();
+        items = json.items ?? [];
+      }
+      setFeatured(items.slice(0, 3));
     })();
-    return () => {
-      alive = false;
-    };
   }, []);
 
   return (
-    <section className="grid gap-12 md:grid-cols-2 items-center">
-      <div className="space-y-6">
-        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-neutral-800">Momentia</h1>
-        <p className="text-neutral-600 leading-relaxed">
-          瞬間が生きる場所。風景や花のマクロを中心に、写真を美しく展示し、将来的にはデジタル販売やプリントにも対応していく予定です。
-        </p>
-        <div className="flex gap-3">
-          <Link
-            href="/gallery"
-            className="rounded-md border border-neutral-900 px-4 py-2 text-sm hover:bg-neutral-900 hover:text-white transition"
-          >
-            View Gallery
-          </Link>
-          <Link
-            href="/admin/upload"
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 transition"
-          >
-            Admin Upload
-          </Link>
-        </div>
-      </div>
+    <main className="bg-neutral-50">
+      {/* Hero: 背景画像とアニメーションを追加 */}
+      <section className="relative h-[58vh] md:h-[60vh] min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
+        {/* 背景画像: publicフォルダからのパスを指定してください */}
+        <Image
+          src="/hero-image.jpg"
+          alt="Hero background"
+          fill
+          className="object-cover z-0"
+          priority
+        />
+        {/* 背景オーバーレイ */}
+        <div className="absolute inset-0 bg-black/30 z-10" />
 
-      {/* Hero */}
-      <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-200 ring-1 ring-black/5 shadow-md">
-        {hero?.urls?.large ? (
-          <Image
-            src={hero.urls.large || hero.urls.original}
-            alt={hero.caption || hero.slug}
-            fill
-            priority
-            sizes="(min-width: 768px) 50vw, 100vw"
-            className="object-cover"
-          />
-        ) : null}
-        {/* overlay */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-black/0 to-black/0" />
-        {/* caption & CTA overlay */}
-        <div className="absolute inset-x-0 bottom-0 p-4 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-white/95 text-sm md:text-base font-medium line-clamp-2 drop-shadow">
-              {hero?.caption ?? "今日の一枚"}
-            </div>
-          </div>
-          {hero ? (
+        {/* 背景グレインテクスチャ */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-15 z-20"
+          style={{
+            backgroundImage: "url(/textures/grain.png)",
+            backgroundSize: "300px 300px",
+            mixBlendMode: "overlay",
+          }}
+        />
+
+        {/* コンテンツ */}
+        <div className="relative z-30 px-4">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            // tailwind.config.jsで設定したセリフ体フォントを適用
+            className="font-serif text-4xl md:text-6xl font-medium tracking-tight text-white drop-shadow-md"
+          >
+            Momentia
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+            className="mt-4 text-lg md:text-xl text-neutral-200 max-w-2xl mx-auto drop-shadow"
+          >
+            光と時間の呼吸を、そっと額に。— 静けさを連れてくる写真たち。
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
+            className="mt-8 flex flex-wrap gap-4 justify-center"
+          >
             <Link
-              href={`/purchase/${hero.slug}`}
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-lg bg-white/95 text-black px-3 py-1.5 text-sm font-semibold shadow hover:shadow-md hover:bg-white active:scale-[0.99] transition"
+              href="/gallery"
+              // ガラスモーフィズム風のデザインに更新
+              className="inline-flex items-center rounded-lg border border-white/30 bg-white/20 backdrop-blur-sm px-5 py-2.5 text-base font-medium text-white shadow-sm hover:bg-white/30 transition-colors"
             >
-              Purchase
+              ギャラリーを見る
             </Link>
-          ) : null}
+            {/* <Link
+              href="/purchase/info"
+              className="inline-flex items-center rounded-lg px-5 py-2.5 bg-white text-base font-medium text-neutral-900 hover:bg-neutral-200 transition-colors"
+            >
+              ご購入について
+            </Link> */}
+          </motion.div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* Featured Works: ホバーエフェクトとデザインを更新 */}
+      <section className="py-6 sm:py-8 bg-white">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <header className="mb-8 md:mb-8">
+            <h2 className="font-serif text-3xl md:text-4xl font-medium text-neutral-900">
+              Featured Works
+            </h2>
+          </header>
+
+          <div className="-m-2 flex flex-wrap">
+            {featured.map((p) => {
+              const src = p.urls.thumb || p.urls.large || p.urls.original;
+              return (
+                <div key={p.slug} className="w-full md:w-1/3 p-2">
+                  <Link
+                    href={`/gallery#${p.slug}`}
+                    className="group relative block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 hover:shadow-xl transition-shadow duration-300"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={p.caption ?? p.slug}
+                      className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    {/* ホバー時に表示されるグラデーションオーバーレイ */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    
+                    <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+                      {/* ホバーでキャプションが浮き上がるアニメーション */}
+                      <div className="transform transition-transform duration-500 ease-in-out group-hover:-translate-y-2">
+                        <p className="text-lg font-medium drop-shadow-md">{p.caption || "—"}</p>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              );
+            })}
+            {featured.length === 0 && (
+              <div className="w-full p-2 text-neutral-500">注目の作品はまだありません。</div>
+            )}
+          </div>
+        </div>
+      </section>
+
+       {/* About teaser */}
+      <section className="bg-white/60 backdrop-blur-[1px] py-6 sm:py-8 md:py-10">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
+          <Link
+            href="/about"
+            className="group block rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
+          >
+            <div className="flex items-start gap-5">
+              <div className="shrink-0 ring-1 ring-black/10 overflow-hidden w-14 h-14 flex items-center justify-center">
+                {/* ロゴやポートレートを置く場合は /public/logos/Evoluzio_Logo.png を利用 */}
+                <Image
+                  src="/logos/Evlogo.jpg"
+                  alt="Evoluzio Inc."
+                  width={40}
+                  height={40}
+                  className="opacity-80"
+                />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-serif text-2xl font-medium tracking-tight text-neutral-900">
+                  Momentiaについて
+                </h3>
+                <p className="mt-2 text-neutral-600 leading-relaxed">
+                  Momentia は Evoluzio Inc. が運営する写真レーベル。作品づくりの背景や制作プロセス、
+                  額装の方針などを短くまとめました。詳しくはプロフィールページへ。
+                </p>
+                <div className="mt-4 inline-flex items-center gap-2 text-neutral-900 font-medium">
+                  もっと見る
+                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </section>
+      
+    </main>
   );
 }

@@ -13,7 +13,10 @@ This roadmap outlines the key development milestones for the Momentia photo port
 - ✅ Implement user authentication and authorization.
 - ✅ Establish CI/CD pipeline for automated deployment to Azure.
 - ✅ Write unit tests for core components and API endpoints.
-- For store-related features (e.g., print or digital sales), release initial version with a "Coming Soon" placeholder page and implement actual store functionality later.
+- Ship MVP purchase flow with **Stripe Checkout** (hosted page). Start with single-item “Buy now”, later expand to cart.
+- Keep print sales as **Coming Soon**; evaluate FUJIFILM WALLDECOR or domestic lab partners for framed print fulfillment.
+- Lock down **Blob** originals to **Private**; serve images via short‑lived **SAS** or server streaming; keep thumbnails cacheable.
+- Add basic **watermark** for lightbox previews (server-side, tunable via env).
 
 ## Mid-term Goals (3–6 months)
 
@@ -26,6 +29,8 @@ This roadmap outlines the key development milestones for the Momentia photo port
 - Improve security with role-based access control and data validation.
 - Conduct performance testing and optimize database queries.
 - Expand test coverage with integration and end-to-end tests.
+- Add **PayPal** as an alternative payment method; **Amazon Pay** to be evaluated post‑launch.
+- Strengthen security: **CSP** hardening, API **rate limiting**, upload size caps; introduce basic WAF rules.
 
 ## Long-term Goals (6+ months)
 
@@ -49,6 +54,7 @@ This roadmap outlines the key development milestones for the Momentia photo port
 1. **Entra ID Redirect URIs**
    - Add production URL:
      ```
+     https://momentia.evoluzio.com/api/auth/callback/azure-ad
      https://momentia.azurewebsites.net/api/auth/callback/azure-ad
      ```
    - Keep local development URI:
@@ -64,7 +70,7 @@ This roadmap outlines the key development milestones for the Momentia photo port
    - `DATABASE_URL` → Point to production PostgreSQL instance.
 
 3. **Azure App Service Configuration**
-   - Set all required environment variables in Application Settings.
+   - Set all required environment variables in Applwication Settings.
    - If using deployment slots (staging/prod), configure both.
 
 4. **Security Checks**
@@ -72,7 +78,14 @@ This roadmap outlines the key development milestones for the Momentia photo port
    - Validate that admin pages are behind authentication.
    - Remove any development/test accounts.
 
-5. **Final Verification**
+5. **Payments (MVP – Stripe Checkout)**
+   - Create **Product** and **Price** in Stripe Dashboard (JPY).
+   - Server route: `/api/checkout/create` → creates Checkout Session with success/cancel URLs.
+   - Webhook: handle `checkout.session.completed` → mark order paid, issue license/SAS for download, email receipt.
+   - Environment: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBKEY`.
+   - Test cardsを用いた本番前テスト（3Dセキュア含む）。
+
+6. **Final Verification**
    - Test the authentication flow in production.
    - Verify image uploads and gallery display.
    - Confirm that CDN caching works as expected.
@@ -81,4 +94,4 @@ This roadmap outlines the key development milestones for the Momentia photo port
 
 _This checklist helps ensure smooth deployment and minimizes configuration errors._
 
-_Last Updated: YYYY-MM-DD_
+_Last Updated: 2025-08-18_

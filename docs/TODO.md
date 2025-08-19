@@ -42,6 +42,13 @@ Implement a lightweight CMS for blog posts so that articles can be added/edited 
    - Use Azure Managed PostgreSQL or similar for DB
    - Migrate existing `.mdx` posts into the database
 
+6. **Security & Access Control**
+   - Blob storage must be private (no anonymous access)
+   - Use SAS tokens or API streaming to serve images
+   - Admin endpoints must require authentication
+   - Apply rate limiting and size limits to uploads and API routes
+
 ## Notes
 - Initial version can be text + images only; advanced MDX components can be added later.
 - Keep styling consistent with current `prose` typography setup.
+- Stripe Checkout will be used for initial payment integration; PayPal may be added later, Amazon Pay considered in future.
