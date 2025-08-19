@@ -50,7 +50,14 @@ function signedUrl(storagePath: string, ttlMinutes = 15): string {
 type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }>;
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
+  // Robust URL parsing (CI/prerender safety)
+  let searchParams: URLSearchParams;
+  try {
+    searchParams = new URL(req.url).searchParams;
+  } catch {
+    // Fallback when req.url is somehow not absolute (shouldn't happen, but safer for CI)
+    searchParams = new URLSearchParams();
+  }
   const q = searchParams.get("q")?.trim();
   const kw = searchParams.get("keyword")?.trim();
   const limit = Math.min(Number(searchParams.get("limit") ?? 100), 200);

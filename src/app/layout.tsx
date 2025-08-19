@@ -20,7 +20,9 @@ const lora = Lora({
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
+const _base = process.env.NEXT_PUBLIC_BASE_URL;
 export const metadata: Metadata = {
+  ...(_base ? { metadataBase: new URL(_base) } : {}),
   title: "Momentia",
   description: "Momentia — A photo portfolio & sales platform",
 };
