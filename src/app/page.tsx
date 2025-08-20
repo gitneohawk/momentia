@@ -45,7 +45,7 @@ export default function Home() {
       <section className="relative h-[58vh] md:h-[60vh] min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
         {/* 背景画像: publicフォルダからのパスを指定してください */}
         <Image
-          src="/hero-image.jpg"
+          src="/hero-image.avif"
           alt="Hero background"
           fill
           className="object-cover z-0"
