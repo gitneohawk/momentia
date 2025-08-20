@@ -239,4 +239,6 @@ When starting a **new chat** with ChatGPT, Claude, or GitHub Copilot Chat, paste
 
 This ensures context is preserved even in fresh sessions.
 
+
+
 ---
