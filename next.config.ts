@@ -19,9 +19,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "momentia1.blob.core.windows.net", pathname: "/photos/**" },
     ],
   },
-  experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "prisma"],
-  },
+  serverExternalPackages: ["@prisma/client", "prisma"],
 };
 
 // Export the final config, wrapped by the analyzer

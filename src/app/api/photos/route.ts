@@ -19,81 +19,78 @@ function mask(s?: string | null, showPrefix = 3) {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// === Azure Blob (Azure 本番のみ) SAS 署名URL生成 ===
-const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
-const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1];
-const KEY = /AccountKey=([^;]+)/i.exec(CONN)?.[1];
-const DB = process.env.DATABASE_URL ?? "";
-
-// 起動時に一度だけ環境チェックを出す（秘密は出さない）
-try {
-  const accMasked = mask(ACC);
-  const keyInfo = KEY ? `len:${KEY.length}` : "(none)";
-  console.info("[/api/photos] boot env check", {
-    hasConn: Boolean(CONN),
-    hasDb: Boolean(DB),
-    hasAcc: Boolean(ACC),
-    acc: accMasked,
-    hasKey: Boolean(KEY),
-    key: keyInfo,
-    nodeEnv: process.env.NODE_ENV,
-  });
-  if (!ACC || !KEY) {
-    console.warn("[/api/photos] Missing AZURE_STORAGE_CONNECTION_STRING (AccountName/AccountKey).");
-  }
-} catch (e) {
-  console.error("[/api/photos] env check logging failed", e);
-}
-
-const credential = ACC && KEY ? new StorageSharedKeyCredential(ACC, KEY) : null;
-const container = "photos";
-
-function signedUrl(storagePath: string, ttlMinutes = 15): string {
-  if (!credential || !ACC) {
-    // 生成不能時は空文字返却。呼び出し側で null 判定可。
-    // 過度なログを避けるため、最初の数回のみ通知。
-    if ((globalThis as any).__photosSignedUrlWarned__ !== true) {
-      (globalThis as any).__photosSignedUrlWarned__ = true;
-      console.warn("[/api/photos] signedUrl disabled (no credential). Returning empty URL.");
-    }
-    return "";
-  }
-
-  const now = new Date();
-  const startsOn = new Date(now.getTime() - 60 * 1000); // クロックスキュー吸収のため -1min
-  const expiresOn = new Date(now.getTime() + ttlMinutes * 60 * 1000);
-
-  const sas = generateBlobSASQueryParameters(
-    {
-      containerName: container,
-      blobName: storagePath,
-      permissions: BlobSASPermissions.parse("r"), // 読み取り専用
-      protocol: SASProtocol.Https,
-      startsOn,
-      expiresOn,
-    },
-    credential
-  ).toString();
-
-  return `https://${ACC}.blob.core.windows.net/${container}/${encodeURI(storagePath)}?${sas}`;
-}
-
 // relations を含む payload 型
 type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }>;
 
+const container = "photos";
+
 export async function GET(req: Request) {
   const t0 = Date.now();
+
   // Robust URL parsing (CI/prerender safety)
   let searchParams: URLSearchParams;
   try {
     searchParams = new URL(req.url).searchParams;
   } catch {
-    // Fallback when req.url is somehow not absolute (shouldn't happen, but safer for CI)
     searchParams = new URLSearchParams();
   }
   const q = searchParams.get("q")?.trim();
   const kw = searchParams.get("keyword")?.trim();
   const limit = Math.min(Number(searchParams.get("limit") ?? 100), 200);
+
+  // === Azure Blob: ビルド時に実行されないよう、ここで初めて環境変数を読む ===
+  const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
+  const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1] ?? null;
+  const KEY = /AccountKey=([^;]+)/i.exec(CONN)?.[1] ?? null;
+
+  // 最初の呼び出しでだけ環境の有無を軽くログ（秘密は出さない）
+  if ((globalThis as any).__photosBootLogged__ !== true) {
+    (globalThis as any).__photosBootLogged__ = true;
+    try {
+      console.info("[/api/photos] boot env check(rt)", {
+        hasConn: Boolean(CONN),
+        hasAcc: Boolean(ACC),
+        acc: mask(ACC ?? undefined),
+        hasKey: Boolean(KEY),
+        keyLen: KEY?.length ?? 0,
+        nodeEnv: process.env.NODE_ENV,
+      });
+      if (!ACC || !KEY) console.warn("[/api/photos] Missing AZURE_STORAGE_CONNECTION_STRING (AccountName/AccountKey).");
+    } catch (e) {
+      console.error("[/api/photos] env check logging failed", e);
+    }
+  }
+
+  const credential = ACC && KEY ? new StorageSharedKeyCredential(ACC, KEY) : null;
+
+  const signedUrl = (storagePath: string, ttlMinutes = 15): string => {
+    if (!credential || !ACC) {
+      // 生成不能時は空文字返却。呼び出し側で null 判定可。
+      if ((globalThis as any).__photosSignedUrlWarned__ !== true) {
+        (globalThis as any).__photosSignedUrlWarned__ = true;
+        console.warn("[/api/photos] signedUrl disabled (no credential). Returning empty URL.");
+      }
+      return "";
+    }
+
+    const now = new Date();
+    const startsOn = new Date(now.getTime() - 60 * 1000); // -1min skew
+    const expiresOn = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+
+    const sas = generateBlobSASQueryParameters(
+      {
+        containerName: container,
+        blobName: storagePath,
+        permissions: BlobSASPermissions.parse("r"),
+        protocol: SASProtocol.Https,
+        startsOn,
+        expiresOn,
+      },
+      credential
+    ).toString();
+
+    return `https://${ACC}.blob.core.windows.net/${container}/${encodeURI(storagePath)}?${sas}`;
+  };
 
   console.info("[/api/photos] request", { q, kw, limit, hasCred: Boolean(credential) });
 
@@ -123,15 +120,12 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("[/api/photos] prisma findMany failed", {
       errMessage: (err as Error)?.message,
-      hasDb: Boolean(DB),
     });
     return NextResponse.json(
       { error: "DB_ERROR", message: "failed to fetch photos" },
       { status: 500 }
     );
   }
-
-  console.info("[/api/photos] db result", { count: photos.length });
 
   let missingThumb = 0;
   let missingLarge = 0;
