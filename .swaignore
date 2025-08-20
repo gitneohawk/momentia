@@ -1,0 +1,15 @@
+# ビルドキャッシュや生成物
+.next/cache
+.next/server/app/**/*.map
+.next/server/chunks/**/*.map
+node_modules
+*.log
+
+# prisma の生成物やローカルのみのもの
+prisma/generated
+**/*.psd
+**/*.zip
+
+# 画像などの巨大アセットを誤って同梱しない
+public/originals
+public/raw
