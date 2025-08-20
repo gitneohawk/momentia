@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
+import nextBundleAnalyzer from '@next/bundle-analyzer';
 
-// Unified Next.js config (TS). Remove next.config.js after this is applied.
+// Set up the bundle analyzer function
+const withBundleAnalyzer = nextBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+// Your existing Next.js configuration
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
@@ -13,6 +19,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "momentia1.blob.core.windows.net", pathname: "/photos/**" },
     ],
   },
+  experimental: {
+    serverComponentsExternalPackages: ["@prisma/client", "prisma"],
+  },
 };
 
-export default nextConfig;
+// Export the final config, wrapped by the analyzer
+export default withBundleAnalyzer(nextConfig);

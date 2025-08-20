@@ -13,7 +13,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import * as exifr from 'exifr';
-import { PrismaClient } from "@generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { BlobServiceClient } from '@azure/storage-blob';
 
 const prisma = new PrismaClient();
