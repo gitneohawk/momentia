@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma, Variant, Keyword } from "@generated/prisma/client";
+import type { Prisma, Variant, Keyword } from "@prisma/client";
 
 import {
   StorageSharedKeyCredential,
