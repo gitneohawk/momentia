@@ -1,0 +1,22 @@
+# Dockerfile自体
+Dockerfile
+
+# .dockerignore自体
+.dockerignore
+
+# Git関連
+.git
+.gitignore
+
+# ローカルの依存関係とビルド成果物
+node_modules
+.next
+
+# 環境変数ファイル
+.env
+.env.local
+.env.development
+.env.production
+
+# その他
+README.md

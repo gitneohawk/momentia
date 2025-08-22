@@ -9,6 +9,7 @@ const withBundleAnalyzer = nextBundleAnalyzer({
 // Your existing Next.js configuration
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   images: {
     remotePatterns: [
       // Azurite / local dev

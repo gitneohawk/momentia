@@ -1,22 +1,36 @@
-services:
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
-    command: azurite --loose
-    ports: ["10000:10000", "10001:10001", "10002:10002"]
-    volumes: [ "azurite-data:/data" ]
-    environment:
-      - AZURITE_ACCOUNTS=devstoreaccount1:Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+version: '3.8'
 
-  postgres:
+services:
+  # Next.jsアプリケーション
+  app:
+    image: momentia-app
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    # postgres-1とazurite-1が起動してからappを起動する
+    depends_on:
+      - postgres-1
+      - azurite-1
+
+  # PostgreSQLデータベース
+  postgres-1:
     image: postgres:16
-    ports: ["5433:5432"]
+    ports:
+      - "5433:5432"
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: portfolio
+      POSTGRES_USER: app # .env.localに合わせてください
+      POSTGRES_PASSWORD: app # .env.localに合わせてください
+      POSTGRES_DB: portfolio # .env.localに合わせてください
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+
+  # Azuriteストレージエミュレータ
+  azurite-1:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - "10000:10000"
 
 volumes:
-  azurite-data:
-  pg-data:
+  postgres-data:
