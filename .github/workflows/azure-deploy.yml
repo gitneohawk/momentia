@@ -4,17 +4,9 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-
-env:
-  RESOURCE_GROUP: momentiav1
-  CONTAINER_REGISTRY: momentiaacr
-  CONTAINER_APP_NAME: momentiav1
 
 jobs:
   build_and_deploy:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     name: Build and Deploy Job
 
@@ -22,26 +14,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ env.CONTAINER_REGISTRY }}.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-
-      - name: Build and push Docker image
-        run: |
-          docker build . -t ${{ env.CONTAINER_REGISTRY }}.azurecr.io/momentia:${{ github.sha }}
-          docker push ${{ env.CONTAINER_REGISTRY }}.azurecr.io/momentia:${{ github.sha }}
-
       - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Azure Container Apps
+      - name: Build and deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
-          appName: ${{ env.CONTAINER_APP_NAME }}
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.CONTAINER_REGISTRY }}.azurecr.io/momentia:${{ github.sha }}
+          # ★ここからが修正点
+          resourceGroup: momentiav1
+          containerAppName: momentiav1 # 'appName' から 'containerAppName' に修正
+          acrName: momentiaacr # ACR名を明示的に指定
+          imageToBuild: momentiaacr.azurecr.io/momentia:${{ github.sha }} # ビルドとプッシュをこのアクションに任せる
+          dockerfilePath: Dockerfile # Dockerfileのパスを指定
