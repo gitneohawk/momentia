@@ -2,7 +2,8 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# postinstall(=prisma generate) が schema を参照して失敗するのを防ぐため、依存解決段階ではスクリプトを無効化
+RUN npm ci --ignore-scripts
 
 # ビルド
 FROM node:20-alpine AS builder
