@@ -45,3 +45,4 @@ jobs:
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           # ACRにプッシュ済みの、既存のイメージを指定
           imageToDeploy: ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          targetPort: 3000
