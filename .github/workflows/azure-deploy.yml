@@ -7,9 +7,9 @@ on:
 
 # ワークフロー全体で使う環境変数を定義
 env:
-  RESOURCE_GROUP: momentiav1
+  RESOURCE_GROUP: momentia-v1
   CONTAINER_REGISTRY: momentiaacr.azurecr.io # ACRのログインサーバー名
-  CONTAINER_APP_NAME: momentiav1
+  CONTAINER_APP_NAME: momentia-v1
   IMAGE_NAME: momentia # ACRに保存するイメージ名
 
 jobs:
