@@ -67,4 +67,4 @@ prisma/dev.db
 prisma/dev.db-journal
 
 # utilities
-envenvset.sh
+/scripts/
