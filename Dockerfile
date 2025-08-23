@@ -1,29 +1,45 @@
-# 依存解決
+# ---------------- Stage 1: 依存関係のインストール ----------------
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package*.json ./
-# postinstall(=prisma generate) が schema を参照して失敗するのを防ぐため、依存解決段階ではスクリプトを無効化
-RUN npm ci --ignore-scripts
 
-# ビルド
+# postinstallでのprisma generateの失敗を防ぐため、prismaスキーマを先にコピー
+COPY prisma ./prisma/
+COPY package*.json ./
+RUN npm install
+
+# ---------------- Stage 2: ビルダー ----------------
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# 依存関係をコピー
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Prisma Clientを明示的に生成
+RUN npx prisma generate
+
+# アプリケーションをビルド
+# .env.production があればここで読み込まれる
 RUN npm run build
 
-# 実行
+# ---------------- Stage 3: ランナー（本番環境） ----------------
 FROM node:20-alpine AS runner
 WORKDIR /app
+
 ENV NODE_ENV=production
-# Next standalone 成果物と静的ファイルだけコピー
-COPY --from=builder /app/.next/standalone ./
+
+# ★Prismaの実行に必要なシステムライブラリをインストール
+RUN apk add --no-cache openssl libc6-compat
+
+# ビルダーから、Next.jsのスタンドアロン成果物と静的ファイルだけをコピー
+# standaloneモードは、実行に必要なnode_modulesも自動で含めてくれます
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# ★ ポートは ACA の targetPort と一致させる（3000に揃えるのが無難）
-ENV PORT=3000
+# ポートを指定
 EXPOSE 3000
+ENV PORT 3000
 
-# ★ ここが肝：standalone の server.js を1つだけ起動
+# サーバーを起動
 CMD ["node", "server.js"]
