@@ -1,14 +1,12 @@
-
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/admin/blog/[slug]
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: { slug: string } }
 ) {
-  const { slug } = await params;
+  const { slug } = params;
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   try {
@@ -23,9 +21,9 @@ export async function GET(
 // PUT /api/admin/blog/[slug]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: { slug: string } }
 ) {
-  const { slug } = await params;
+  const { slug } = params;
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   let data: any;
@@ -61,9 +59,9 @@ export async function PUT(
 // DELETE /api/admin/blog/[slug]
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: { slug: string } }
 ) {
-  const { slug } = await params;
+  const { slug } = params;
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   try {
