@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 // GET /api/admin/blog/[slug]
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { slug: string } }
+  ctx: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = params;
+  const { slug } = await ctx.params;
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   try {
@@ -21,9 +21,9 @@ export async function GET(
 // PUT /api/admin/blog/[slug]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { slug: string } }
+  ctx: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = params;
+  const { slug } = await ctx.params;
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   let data: any;
@@ -59,9 +59,9 @@ export async function PUT(
 // DELETE /api/admin/blog/[slug]
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { slug: string } }
+  ctx: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = params;
+  const { slug } = await ctx.params;
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   try {
