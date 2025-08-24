@@ -91,8 +91,13 @@ export async function GET(
       .jpeg({ quality: QUALITY, mozjpeg: true })
       .toBuffer();
 
-    const ab = composed.buffer.slice(composed.byteOffset, composed.byteOffset + composed.byteLength);
-    return new NextResponse(ab, {
+    // Buffer → ArrayBuffer に正規化して返却（型安全）
+    const body: ArrayBuffer = composed.buffer.slice(
+      composed.byteOffset,
+      composed.byteOffset + composed.byteLength
+    ) as ArrayBuffer;
+
+    return new NextResponse(body, {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
