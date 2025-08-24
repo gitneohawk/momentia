@@ -91,10 +91,7 @@ export async function GET(
       .jpeg({ quality: QUALITY, mozjpeg: true })
       .toBuffer();
 
-    const ab = new ArrayBuffer(composed.byteLength);
-    new Uint8Array(ab).set(composed);
-    const outBlob = new Blob([ab], { type: "image/jpeg" });
-    return new Response(outBlob, {
+    return new NextResponse(composed, {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",

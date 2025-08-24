@@ -11,6 +11,8 @@ import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
 
+// Feature flag: toggle purchase flow (1 = enabled)
+const PURCHASE_ENABLED = process.env.NEXT_PUBLIC_PURCHASE_ENABLED === "1";
 
 // ===== Types =====
 type Item = {
@@ -147,15 +149,32 @@ export default function GalleryPage() {
                         {((active.priceDigitalJPY ?? 3000) as number).toLocaleString()}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        router.push(`/purchase/${active.slug}`);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white text-black px-4 py-1.5 text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.99] transition-all"
-                    >
-                      Purchase
-                    </button>
+                    {PURCHASE_ENABLED ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            router.push(`/purchase/${active.slug}`);
+                          } catch (e) {
+                            console.error("[gallery] navigate to purchase failed:", e);
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-white text-black px-4 py-1.5 text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.99] transition-all"
+                        aria-label="Purchase this photo"
+                      >
+                        Purchase
+                      </button>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-2 rounded-lg bg-white/60 text-black/50 px-4 py-1.5 text-sm font-semibold shadow-inner cursor-not-allowed select-none"
+                        title="Purchase flow is coming soon"
+                        aria-disabled="true"
+                        role="button"
+                        tabIndex={-1}
+                      >
+                        Purchase (coming soon)
+                      </span>
+                    )}
                   </>
                 )}
               </div>,
@@ -178,3 +197,5 @@ export default function GalleryPage() {
     </div>
   );
 }
+
+// NOTE: Set NEXT_PUBLIC_PURCHASE_ENABLED=1 to enable the purchase CTA and /purchase/[slug] navigation.
