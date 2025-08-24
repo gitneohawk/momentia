@@ -44,26 +44,43 @@ function svgWatermark(text: string, imgWidth: number) {
 
 
 function getContainerClient(log?: (...args: any[]) => void) {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  if (conn) {
-    log?.("auth", { mode: "conn-string" });
-    const service = BlobServiceClient.fromConnectionString(conn);
-    return service.getContainerClient(CONTAINER);
-  }
   const account =
     process.env.AZURE_STORAGE_ACCOUNT ||
     process.env.STORAGE_ACCOUNT_NAME ||
     process.env.NEXT_PUBLIC_STORAGE_ACCOUNT;
-  if (!account) {
-    throw new Error(
-      "Storage account name missing. Set AZURE_STORAGE_ACCOUNT (or STORAGE_ACCOUNT_NAME / NEXT_PUBLIC_STORAGE_ACCOUNT)."
-    );
+
+  // Detect if Managed Identity is available in the container environment
+  // (ACA/Functions/VMs expose one or more of these variables when MSI is enabled)
+  const msiAvailable = Boolean(
+    process.env.IDENTITY_ENDPOINT ||
+    process.env.MSI_ENDPOINT ||
+    process.env.AZURE_CLIENT_ID
+  );
+
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
+
+  // Prefer Managed Identity when available (more robust than conn strings, which may rotate)
+  if (msiAvailable && account) {
+    log?.("auth", { mode: "managed-identity", account });
+    const url = `https://${account}.blob.core.windows.net`;
+    const credential = new DefaultAzureCredential();
+    const service = new BlobServiceClient(url, credential);
+    return service.getContainerClient(CONTAINER);
   }
-  log?.("auth", { mode: "managed-identity", account });
-  const url = `https://${account}.blob.core.windows.net`;
-  const credential = new DefaultAzureCredential();
-  const service = new BlobServiceClient(url, credential);
-  return service.getContainerClient(CONTAINER);
+
+  if (conn) {
+    // Fall back to connection string
+    // (Optional) try to extract account name for logging
+    const acctMatch = conn.match(/AccountName=([^;]+)/i);
+    log?.("auth", { mode: "conn-string", account: acctMatch?.[1] ?? undefined });
+    const service = BlobServiceClient.fromConnectionString(conn);
+    return service.getContainerClient(CONTAINER);
+  }
+
+  // If we reach here, we don't have enough info
+  throw new Error(
+    "Storage configuration missing. Provide either Managed Identity + AZURE_STORAGE_ACCOUNT (or STORAGE_ACCOUNT_NAME / NEXT_PUBLIC_STORAGE_ACCOUNT), or AZURE_STORAGE_CONNECTION_STRING."
+  );
 }
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
@@ -109,6 +126,7 @@ export async function GET(
 
     const container = getContainerClient(log);
     const blobClient = container.getBlockBlobClient(sourcePath);
+    log("downloading", { blob: sourcePath });
     const dl = await blobClient.download();
     const input = await streamToBuffer(dl.readableStreamBody!);
     log("blob downloaded", { contentLength: dl.contentLength, bufLen: input.length });
