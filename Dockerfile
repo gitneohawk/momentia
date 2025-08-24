@@ -1,45 +1,31 @@
-# ---------------- Stage 1: 依存関係のインストール ----------------
+# ---------- deps ----------
 FROM node:20-alpine AS deps
 WORKDIR /app
-
-# postinstallでのprisma generateの失敗を防ぐため、prismaスキーマを先にコピー
-COPY prisma ./prisma/
+RUN apk add --no-cache libc6-compat openssl
 COPY package*.json ./
-RUN npm install
+# dev依存も入るように（NODE_ENV=production をここで付けない）
+# RUN --mount=type=cache,target=/root/.npm \
+#    npm ci --ignore-scripts
+RUN npm ci --ignore-scripts
 
-# ---------------- Stage 2: ビルダー ----------------
+# ---------- builder ----------
 FROM node:20-alpine AS builder
 WORKDIR /app
-
-# 依存関係をコピー
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Prisma Clientを明示的に生成
+# Prisma Client 生成（スキーマはこの時点で存在）
 RUN npx prisma generate
-
-# アプリケーションをビルド
-# .env.production があればここで読み込まれる
+# Next のビルド（キャッシュは任意）
+#RUN --mount=type=cache,target=/app/.next/cache \
+#    npm run build
 RUN npm run build
-
-# ---------------- Stage 3: ランナー（本番環境） ----------------
+# ---------- runner ----------
 FROM node:20-alpine AS runner
 WORKDIR /app
-
-ENV NODE_ENV=production
-
-# ★Prismaの実行に必要なシステムライブラリをインストール
-RUN apk add --no-cache openssl libc6-compat
-
-# ビルダーから、Next.jsのスタンドアロン成果物と静的ファイルだけをコピー
-# standaloneモードは、実行に必要なnode_modulesも自動で含めてくれます
+RUN apk add --no-cache libc6-compat openssl
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-
-# ポートを指定
+ENV PORT=3000
 EXPOSE 3000
-ENV PORT 3000
-
-# サーバーを起動
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "server.js"]

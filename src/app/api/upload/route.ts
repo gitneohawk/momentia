@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { BlobServiceClient } from "@azure/storage-blob";
+import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
+import { DefaultAzureCredential } from "@azure/identity";
 
 import sharp from "sharp";
 import * as exifr from "exifr";
@@ -11,7 +12,69 @@ export const dynamic = "force-dynamic"; // 開発中はキャッシュ無効でO
 const CONTAINER_NAME = "photos";
 const ORIG_PREFIX = "originals/";
 const PUB_PREFIX = "public/";
+const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT || "momentiastorage";
 
+function parseConnString(raw: string) {
+  const s = raw.trim().replace(/^\s*['"]|['"]\s*$/g, ""); // 前後のクォート/空白を剥がす
+  const entries = s
+    .split(";")
+    .map((kv): [string, string] | null => {
+      const idx = kv.indexOf("=");
+      if (idx === -1) return null;
+      const key = kv.slice(0, idx).trim();
+      const val = kv.slice(idx + 1).trim();
+      return key && val ? [key, val] : null;
+    })
+    .filter((e): e is [string, string] => !!e);
+  const map = new Map<string, string>(entries);
+  const accountName = map.get("AccountName");
+  const accountKey  = map.get("AccountKey");
+  const protocol    = map.get("DefaultEndpointsProtocol") || "https";
+  const endpointSuffix = map.get("EndpointSuffix") || "core.windows.net";
+  if (!accountName || !accountKey) throw new Error("Invalid storage connection string (missing AccountName/AccountKey)");
+  const endpoint = `${protocol}://${accountName}.blob.${endpointSuffix}`;
+  return { accountName, accountKey, endpoint };
+}
+
+function makeBlobService(rawConn: string) {
+  const { accountName, accountKey, endpoint } = parseConnString(rawConn);
+  const cred = new StorageSharedKeyCredential(accountName, accountKey);
+  return new BlobServiceClient(endpoint, cred, {
+    // 任意：再試行やタイムアウトを好みに
+    retryOptions: { maxTries: 3 },
+  });
+}
+
+function makeBlobServiceWithMsi() {
+  const endpoint = `https://${ACCOUNT_NAME}.blob.core.windows.net`;
+  const cred = new DefaultAzureCredential();
+  return new BlobServiceClient(endpoint, cred, { retryOptions: { maxTries: 3 } });
+}
+
+function getBlobService() {
+  // Prefer MSI when explicitly enabled
+  if (process.env.AZURE_USE_MSI === "1") {
+    const endpoint = `https://${ACCOUNT_NAME}.blob.core.windows.net`;
+    console.log("[storage] mode=msi endpoint=", endpoint);
+    return makeBlobServiceWithMsi();
+  }
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) {
+    throw new Error("missing storage connection");
+  }
+  console.log(
+    "[storage]",
+    conn.includes("devstoreaccount1") ? "azurite" : conn.split(";").slice(0, 2).join(";")
+  );
+  return makeBlobService(conn);
+}
+
+async function ensureContainer() {
+  const service = getBlobService();
+  const container = service.getContainerClient(CONTAINER_NAME);
+  await container.createIfNotExists(); // 409はOK
+  return container;
+}
 
 function slugify(input: string): string {
   return input
@@ -20,13 +83,6 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9\-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-async function ensureContainer(conn: string) {
-  const service = BlobServiceClient.fromConnectionString(conn);
-  const container = service.getContainerClient(CONTAINER_NAME);
-  await container.createIfNotExists(); // 権限はPortal側で設定済み想定
-  return container;
 }
 
 export async function POST(req: Request) {
@@ -40,11 +96,13 @@ export async function POST(req: Request) {
     const arrayBuffer = await (file as File).arrayBuffer();
     const src = Buffer.from(arrayBuffer);
 
-    const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-    console.log("[storage]", conn?.includes("devstoreaccount1") ? "azurite" : conn?.split(";").slice(0,2).join(";"));
-    if (!conn) return NextResponse.json({ error: "missing storage connection" }, { status: 500 });
-
-    const container = await ensureContainer(conn);
+    let container;
+    try {
+      container = await ensureContainer();
+    } catch (err: any) {
+      console.error("[storage] init error:", err?.message || err);
+      return NextResponse.json({ error: "storage init failed" }, { status: 500 });
+    }
 
     const base = (file as File).name.replace(/\.[^.]+$/, "");
     const slug = slugify(base);

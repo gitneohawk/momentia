@@ -10,7 +10,6 @@
     "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
-    "start:prod": "npx prisma migrate deploy && node server.js",
     "lint": "next lint",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down --remove-orphans",
@@ -20,6 +19,7 @@
     "postinstall": "echo \"[postinstall] prisma generate\" && prisma generate"
   },
   "dependencies": {
+    "@azure/identity": "^4.10.1",
     "@azure/storage-blob": "^12.27.0",
     "@prisma/client": "^6.14.0",
     "date-fns": "^4.1.0",

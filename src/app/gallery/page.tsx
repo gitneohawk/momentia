@@ -128,7 +128,8 @@ export default function GalleryPage() {
           close={() => setIndex(-1)}
           index={index >= 0 ? index : 0}
           slides={visibleItems.map((i) => ({
-            src: `/api/wm/${i.slug}`,
+            // Prefer large (SAS) → fall back to original → thumb
+            src: (i.urls.large ?? i.urls.original ?? i.urls.thumb) as string,
             description: i.caption ?? "",
           }))}
           animation={{ fade: 250 }}

@@ -33,6 +33,20 @@ export async function PATCH(
     if (typeof body.caption === "string") data.caption = body.caption;
     if (typeof body.published === "boolean") data.published = body.published;
 
+    // Accept price updates (supports multiple payload shapes)
+    // Allowed keys: priceDigitalJPY (preferred), price, priceJPY
+    const priceRaw = body.priceDigitalJPY ?? body.price ?? body.priceJPY;
+    if (priceRaw !== undefined) {
+      if (priceRaw === null) {
+        data.priceDigitalJPY = null;
+      } else {
+        const n = Number(priceRaw);
+        if (Number.isFinite(n) && n >= 0) {
+          data.priceDigitalJPY = Math.trunc(n);
+        }
+      }
+    }
+
     // Normalize keywords if provided
     let incomingKeywords: string[] | null = null;
     if (Array.isArray(body.keywords)) {

@@ -10,7 +10,8 @@ type Form = {
 };
 
 export default function AdminBlogEdit() {
-  const { slug } = useParams<{ slug: string }>();
+  const params = useParams<{ slug: string | string[] }>();
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const router = useRouter();
 
   const [form, setForm] = useState<Form>({
@@ -24,6 +25,7 @@ export default function AdminBlogEdit() {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      if (!slug) { setLoading(false); return; }
       try {
         const res = await fetch(`/api/admin/blog/${slug}`, { cache: "no-store" });
         if (!res.ok) { setMsg("記事を取得できませんでした"); return; }
@@ -45,7 +47,7 @@ export default function AdminBlogEdit() {
         setLoading(false);
       }
     })();
-  }, [slug]);
+  }, [slug ?? ""]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +56,7 @@ export default function AdminBlogEdit() {
       title: form.title,
       description: form.description || null,
       heroPath: form.heroPath || null,
-      tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean),
+      tags: (form.tags || "").split(",").map((s) => s.trim()).filter(Boolean),
       bodyMdx: form.bodyMdx,
       published: form.published,
       date: form.date ? new Date(form.date).toISOString() : null,
@@ -65,7 +67,13 @@ export default function AdminBlogEdit() {
       body: JSON.stringify(payload),
     });
     setBusy(false);
-    setMsg(res.ok ? "保存しました" : "エラー");
+    if (res.ok) {
+      setMsg("保存しました");
+    } else {
+      let detail = "";
+      try { const j = await res.json(); detail = j?.error ? `: ${j.error}` : ""; } catch {}
+      setMsg(`エラー${detail}`);
+    }
     if (res.ok) router.refresh();
   };
 
@@ -77,12 +85,15 @@ export default function AdminBlogEdit() {
     if (res.ok) {
       router.push("/admin/blog");
     } else {
-      setMsg("削除に失敗しました");
+      let detail = "";
+      try { const j = await res.json(); detail = j?.error ? `: ${j.error}` : ""; } catch {}
+      setMsg(`削除に失敗しました${detail}`);
     }
   };
 
   return (
     <section className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      {!slug && <p className="text-sm text-neutral-500 mb-4">パラメータ待機中…</p>}
       <h1 className="text-xl font-semibold mb-4">記事編集: {slug}</h1>
       {loading && <p className="text-sm text-neutral-500 mb-4">読み込み中…</p>}
       <form onSubmit={submit} className="space-y-4">

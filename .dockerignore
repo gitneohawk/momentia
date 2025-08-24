@@ -11,6 +11,7 @@ Dockerfile
 # ローカルの依存関係とビルド成果物
 node_modules
 .next
+dist
 
 # 環境変数ファイル
 .env

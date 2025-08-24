@@ -20,7 +20,7 @@ function svgWatermark(text: string, imgWidth: number) {
   const svgWidth = Math.max(600, Math.min(1200, Math.round(imgWidth * 0.6)));
   const svgHeight = Math.round(fontSize * 1.6);
   return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" _height="${svgHeight}">
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
       <style>
         .wm {
           font: ${fontSize}px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -80,11 +80,12 @@ export async function GET(
 
     // 透かしの配置：右下にマージンをとって合成
     // SVG は (0,0) 起点なので、gravity ではなく position 指定で置く
+    const gravity = _WM_PLACEMENT === "bottom-right" ? "southeast" : "centre";
     const composed = await img
       .composite([
         {
           input: wm,
-          gravity: "centre" // ← 完全センタリング
+          gravity
         },
       ])
       .jpeg({ quality: QUALITY, mozjpeg: true })

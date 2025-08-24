@@ -4,9 +4,10 @@ import type { Prisma, Variant, Keyword } from "@prisma/client";
 import {
   StorageSharedKeyCredential,
   BlobSASPermissions,
-  SASProtocol,
   generateBlobSASQueryParameters,
+  BlobServiceClient,
 } from "@azure/storage-blob";
+import { DefaultAzureCredential } from "@azure/identity";
 
 function mask(s?: string | null, showPrefix = 3) {
   if (!s) return "(none)";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
 type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }>;
 
 const container = "photos";
+const ACCOUNT_FROM_ENV = process.env.AZURE_STORAGE_ACCOUNT || null;
 
 export async function GET(req: Request) {
   const t0 = Date.now();
@@ -31,6 +33,8 @@ export async function GET(req: Request) {
   const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
   const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1] ?? null;
   const KEY = /AccountKey=([^;]+)/i.exec(CONN)?.[1] ?? null;
+
+  const ACCOUNT = ACCOUNT_FROM_ENV || ACC || null;
 
   // 最初の呼び出しでだけ環境の有無を軽くログ
   if ((globalThis as any).__photosBootLogged__ !== true) {
@@ -45,24 +49,51 @@ export async function GET(req: Request) {
     }
   }
 
-  const getSignedUrl = (storagePath: string, ttlMinutes = 15): string | null => {
-    if (!ACC || !KEY) return null;
-    const credential = new StorageSharedKeyCredential(ACC, KEY);
-
+  const getSignedUrl = async (storagePath: string, ttlMinutes = 15): Promise<string | null> => {
     const now = new Date();
     const startsOn = new Date(now.getTime() - 5 * 60 * 1000);
-    const expiresOn = new Date(now.getTime() + 15 * 60 * 1000);
+    const expiresOn = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
+    // MSI (AAD) 経路: User Delegation SAS を手動生成
+    if (process.env.AZURE_USE_MSI === "1") {
+      if (!ACCOUNT) return null;
+      const endpoint = `https://${ACCOUNT}.blob.core.windows.net`;
+      const svc = new BlobServiceClient(endpoint, new DefaultAzureCredential());
+      try {
+        const udk = await svc.getUserDelegationKey(startsOn, expiresOn);
+        const sas = generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: storagePath,
+            permissions: BlobSASPermissions.parse("r"),
+            startsOn,
+            expiresOn,
+            version: "2021-08-06",
+          },
+          udk,
+          ACCOUNT
+        ).toString();
+        return `${endpoint}/${container}/${encodeURI(storagePath)}?${sas}`;
+      } catch (e) {
+        console.error("[/api/photos] user-delegation-sas error", e);
+        // フォールバックに続く
+      }
+    }
+
+    // Fallback: Shared Key (接続文字列) での SAS 生成
+    if (!ACC || !KEY) return null;
+    const credential = new StorageSharedKeyCredential(ACC, KEY);
     const sas = generateBlobSASQueryParameters(
-      { containerName: container, blobName: storagePath, permissions: BlobSASPermissions.parse("r"),
-        protocol: SASProtocol.Https,
-        startsOn, expiresOn,
-        version: "2021-08-06"
+      {
+        containerName: container,
+        blobName: storagePath,
+        permissions: BlobSASPermissions.parse("r"),
+        startsOn,
+        expiresOn,
+        version: "2021-08-06",
       },
       credential
     ).toString();
-
-    // 本番用のURLのみを返す
     return `https://${ACC}.blob.core.windows.net/${container}/${encodeURI(storagePath)}?${sas}`;
   };
 
@@ -85,7 +116,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
   }
 
-  const items = photos.map((p) => {
+  const items = await Promise.all(photos.map(async (p) => {
     const thumb = p.variants.find((v: Variant) => v.type === "thumb");
     const large = p.variants.find((v: Variant) => v.type === "large");
     return {
@@ -93,12 +124,12 @@ export async function GET(req: Request) {
       capturedAt: p.capturedAt, keywords: p.keywords.map((k: Keyword) => k.word),
       priceDigitalJPY: p.priceDigitalJPY ?? null,
       urls: {
-        original: getSignedUrl(p.storagePath),
-        thumb: thumb ? getSignedUrl(thumb.storagePath) : null,
-        large: large ? getSignedUrl(large.storagePath) : null,
+        original: await getSignedUrl(p.storagePath),
+        thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,
+        large: large ? await getSignedUrl(large.storagePath) : null,
       },
     };
-  });
+  }));
 
   return NextResponse.json({ items }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -1,48 +1,76 @@
-name: Build and Deploy to Azure Container Apps
+name: Deploy to Azure Container Apps
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]             # ← 好きなブランチに
+  workflow_dispatch:
 
-# ワークフロー全体で使う環境変数を定義
+permissions:
+  id-token: write                   # OIDC 必須
+  contents: read
+
 env:
-  RESOURCE_GROUP: momentia-v1
-  CONTAINER_REGISTRY: momentiaacr.azurecr.io # ACRのログインサーバー名
-  CONTAINER_APP_NAME: momentia-v1-1
-  IMAGE_NAME: momentia # ACRに保存するイメージ名
+  RG: momentia-rg
+  APP: momentia
+  ACR: momentiaacr                  # ACR 名（FQDNは ${ACR}.azurecr.io）
+  REPO: momentia
 
 jobs:
-  build_and_deploy:
+  deploy:
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v1
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
         with:
-          login-server: ${{ env.CONTAINER_REGISTRY }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and push Docker image to ACR
+      # ACR でクラウドビルド（amd64ネイティブ、高速・安定）
+      - name: Build image on ACR
         run: |
-          docker build . -t ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          TS=$(date +%Y%m%d-%H%M%S)
+          echo "TAG=${TS}" >> $GITHUB_ENV
+          az acr build -r "$ACR" -t "$REPO:${TS}" .
 
-      - name: Log in to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # タグの出現を待ってから digest を取得（整合性遅延対策）
+      - name: Resolve digest (wait until tag visible)
+        id: digest
+        run: |
+          for i in $(seq 1 12); do
+            CNT=$(az acr repository show-tags -n "$ACR" --repository "$REPO" \
+              --query "[?@=='${TAG}'] | length(@)" -o tsv || echo 0)
+            if [ "${CNT}" = "1" ]; then
+              echo "Tag visible at attempt ${i}"
+              break
+            fi
+            echo "Tag not visible yet (attempt ${i})"
+            sleep 5
+            if [ "$i" -eq 12 ]; then
+              echo "Tag did not appear in ACR within timeout"; exit 2
+            fi
+          done
+          DIGEST=$(az acr manifest list-metadata -r "$ACR" --name "$REPO:${TAG}" \
+            --query "digest" -o tsv)
+          echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Azure Container Apps
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          containerAppName: ${{ env.CONTAINER_APP_NAME }}
-          # ACRにプッシュ済みの、既存のイメージを指定
-          imageToDeploy: ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          targetPort: 3000
+      # digest で ACA 更新（タグの揺らぎを回避）
+      - name: Update Azure Container App (by digest)
+        run: |
+          IMAGE="${ACR}.azurecr.io/${REPO}@${DIGEST}"
+          az containerapp update -n "$APP" -g "$RG" --image "$IMAGE"
+
+      # 最新リビジョンに100%振る（必要なら）
+      - name: Route 100% traffic to latest
+        run: |
+          az containerapp ingress traffic set -n "$APP" -g "$RG" --revision-weight latest=100
+
+      - name: Show active revisions
+        run: |
+          az containerapp revision list -n "$APP" -g "$RG" \
+            --query "[].{Name:name,Active:properties.active,Traffic:properties.trafficWeight}" -o table
