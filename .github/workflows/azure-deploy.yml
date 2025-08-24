@@ -41,6 +41,7 @@ jobs:
       - name: Resolve digest (wait until tag visible)
         id: digest
         run: |
+          # Wait for the tag to appear (eventual consistency)
           for i in $(seq 1 12); do
             CNT=$(az acr repository show-tags -n "$ACR" --repository "$REPO" \
               --query "[?@=='${TAG}'] | length(@)" -o tsv || echo 0)
@@ -54,8 +55,16 @@ jobs:
               echo "Tag did not appear in ACR within timeout"; exit 2
             fi
           done
-          DIGEST=$(az acr manifest list-metadata -r "$ACR" --name "$REPO:${TAG}" \
-            --query "digest" -o tsv)
+
+          # Resolve digest from the tag (use repository-level manifest listing)
+          DIGEST=$(az acr repository show-manifests -n "$ACR" --repository "$REPO" \
+            --query "[?tags[?@=='${TAG}']].digest | [0]" -o tsv)
+
+          if [ -z "$DIGEST" ]; then
+            echo "Failed to resolve digest for tag ${TAG}"; exit 3
+          fi
+
+          echo "Resolved digest: $DIGEST"
           echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
