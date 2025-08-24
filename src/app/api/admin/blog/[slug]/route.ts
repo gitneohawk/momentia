@@ -56,6 +56,15 @@ export async function PUT(
   }
 }
 
+// PATCH /api/admin/blog/[slug]
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ slug: string }> }
+) {
+  // Delegate to the same logic as PUT
+  return PUT(req, ctx);
+}
+
 // DELETE /api/admin/blog/[slug]
 export async function DELETE(
   _req: NextRequest,
