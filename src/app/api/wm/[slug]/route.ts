@@ -7,6 +7,9 @@ import sharp from "sharp";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Debug switch: enable by calling /api/wm/[slug]?debug=1
+const DEBUG_QUERY_KEY = "debug";
+
 const CONTAINER = "photos";
 const QUALITY = 85;          // 出力JPEG品質
 const _MARGIN = 24;           // 端からの余白(px)
@@ -53,10 +56,26 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ slug: string }> }
 ) {
+  // Parse debug flag from query string
+  const url = new URL(_req.url);
+  const debug = url.searchParams.get(DEBUG_QUERY_KEY) === "1" || url.searchParams.get(DEBUG_QUERY_KEY) === "true";
+
+  const log = (...args: any[]) => {
+    if (debug) {
+      // Prefix to make grepping logs easier
+      console.log("[wm]", ...args);
+    }
+  };
+
+  log("request start", { url: url.pathname + url.search });
+
   try {
     const { slug } = await ctx.params;
 
+    log("slug", slug);
+
     const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    log("has storage conn", Boolean(conn));
     if (!conn) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
 
     // DB から対象写真と large 版のパスを取る
@@ -64,25 +83,32 @@ export async function GET(
       where: { slug },
       include: { variants: true },
     });
+    log("photo found?", Boolean(photo), photo ? { id: photo.id, storagePath: photo.storagePath, variants: photo.variants?.map(v => ({ type: v.type, path: v.storagePath })) } : {});
     if (!photo) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const large = photo.variants.find((v) => v.type === "large");
     const sourcePath = (large?.storagePath ?? photo.storagePath); // large 無ければオリジナル
+    log("sourcePath", sourcePath, "chosenVariant", large ? "large" : "original");
 
     const container = blobClientFromConn(conn);
     const blobClient = container.getBlockBlobClient(sourcePath);
     const dl = await blobClient.download();
     const input = await streamToBuffer(dl.readableStreamBody!);
+    log("blob downloaded", { contentLength: dl.contentLength, bufLen: input.length });
 
     // 画像を読み、回転補正＋透かし合成＋再圧縮
     const img = sharp(input).rotate();
-    const { width = 0, height = 0 } = await img.metadata();
+    const meta = await img.metadata();
+    log("image metadata (pre)", { width: meta.width, height: meta.height, format: meta.format, hasProfile: Boolean(meta.icc) });
+    const { width = 0, height = 0 } = meta;
     const { svgBuffer: wm, svgWidth: wmWidth, svgHeight: wmHeight } = svgWatermark(WM_TEXT, width || 0);
+    log("wm computed", { text: WM_TEXT, wmWidth, wmHeight });
 
     // 透かしの配置：右下にマージンをとって合成
     // SVG は (0,0) 起点なので、gravity ではなく position 指定で置く
-    const left = width - wmWidth - _MARGIN;
-    const top = height - wmHeight - _MARGIN;
+    const left = Math.max(0, (width || 0) - wmWidth - _MARGIN);
+    const top = Math.max(0, (height || 0) - wmHeight - _MARGIN);
+    log("placement", { width, height, left, top, margin: _MARGIN });
 
     const composed = await img
       .composite([
@@ -94,6 +120,7 @@ export async function GET(
       ])
       .jpeg({ quality: QUALITY, mozjpeg: true })
       .toBuffer();
+    log("composed buffer", { bytes: composed.length });
 
     // Convert Node.js Buffer to a Uint8Array (BodyInit compatible for NextResponse)
     const u8 = new Uint8Array(
@@ -101,6 +128,8 @@ export async function GET(
       composed.byteOffset,
       composed.byteLength
     );
+
+    log("responding image/jpeg");
 
     return new NextResponse(u8 as BodyInit, {
       status: 200,
@@ -111,7 +140,11 @@ export async function GET(
       },
     });
   } catch (e: any) {
-    console.error("wm error:", e);
+    console.error("wm error:", e?.message || e);
+    // Emit a compact diagnostic into response when debug=1 (non-binary)
+    if (typeof url !== "undefined" && (url.searchParams.get(DEBUG_QUERY_KEY) === "1" || url.searchParams.get(DEBUG_QUERY_KEY) === "true")) {
+      return NextResponse.json({ error: "wm-failed", msg: String(e?.message || e) }, { status: 500 });
+    }
     return NextResponse.json({ error: "wm-failed" }, { status: 500 });
   }
 }
