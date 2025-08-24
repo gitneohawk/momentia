@@ -19,7 +19,7 @@ function svgWatermark(text: string, imgWidth: number) {
   const fontSize = Math.max(18, Math.min(48, Math.round(imgWidth * 0.035))); // 画像幅の3.5%目安（18–48の範囲）
   const svgWidth = Math.max(600, Math.min(1200, Math.round(imgWidth * 0.6)));
   const svgHeight = Math.round(fontSize * 1.6);
-  return Buffer.from(
+  const svgBuffer = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
       <style>
         .wm {
@@ -35,6 +35,7 @@ function svgWatermark(text: string, imgWidth: number) {
       <text x="50%" y="50%" class="wm">${text}</text>
     </svg>`
   );
+  return { svgBuffer, svgWidth, svgHeight };
 }
 
 function blobClientFromConn(conn: string) {
@@ -75,29 +76,33 @@ export async function GET(
 
     // 画像を読み、回転補正＋透かし合成＋再圧縮
     const img = sharp(input).rotate();
-    const { width = 0 } = await img.metadata();
-    const wm = svgWatermark(WM_TEXT, width || 0);
+    const { width = 0, height = 0 } = await img.metadata();
+    const { svgBuffer: wm, svgWidth: wmWidth, svgHeight: wmHeight } = svgWatermark(WM_TEXT, width || 0);
 
     // 透かしの配置：右下にマージンをとって合成
     // SVG は (0,0) 起点なので、gravity ではなく position 指定で置く
-    const gravity = _WM_PLACEMENT === "bottom-right" ? "southeast" : "centre";
+    const left = width - wmWidth - _MARGIN;
+    const top = height - wmHeight - _MARGIN;
+
     const composed = await img
       .composite([
         {
           input: wm,
-          gravity
+          left,
+          top,
         },
       ])
       .jpeg({ quality: QUALITY, mozjpeg: true })
       .toBuffer();
 
-    // Buffer → ArrayBuffer に正規化して返却（型安全）
-    const body: ArrayBuffer = composed.buffer.slice(
+    // Convert Node.js Buffer to a Uint8Array (BodyInit compatible for NextResponse)
+    const u8 = new Uint8Array(
+      composed.buffer,
       composed.byteOffset,
-      composed.byteOffset + composed.byteLength
-    ) as ArrayBuffer;
+      composed.byteLength
+    );
 
-    return new NextResponse(body, {
+    return new NextResponse(u8 as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
