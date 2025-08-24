@@ -139,11 +139,23 @@ export async function GET(
     const { svgBuffer: wm, svgWidth: wmWidth, svgHeight: wmHeight } = svgWatermark(WM_TEXT, width || 0);
     log("wm computed", { text: WM_TEXT, wmWidth, wmHeight });
 
-    // 透かしの配置：右下にマージンをとって合成
-    // SVG は (0,0) 起点なので、gravity ではなく position 指定で置く
-    const left = Math.max(0, (width || 0) - wmWidth - _MARGIN);
-    const top = Math.max(0, (height || 0) - wmHeight - _MARGIN);
-    log("placement", { width, height, left, top, margin: _MARGIN });
+// 透かしの配置：センター or 右下
+let left: number, top: number;
+
+if (_WM_PLACEMENT === "center") {
+  // 画像中心に配置（はみ出し防止で 0 を下限）
+  left = Math.max(0, Math.round(((width || 0) - wmWidth) / 2));
+  top  = Math.max(0, Math.round(((height || 0) - wmHeight) / 2));
+} else {
+  // 右下にマージンを取って配置
+  left = Math.max(0, (width || 0) - wmWidth - _MARGIN);
+  top  = Math.max(0, (height || 0) - wmHeight - _MARGIN);
+}
+
+log("placement", {
+  mode: _WM_PLACEMENT,
+  width, height, left, top, margin: _MARGIN
+});
 
     const composed = await img
       .composite([
