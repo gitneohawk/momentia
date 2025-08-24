@@ -77,7 +77,19 @@ jobs:
       # 最新リビジョンに100%振る（必要なら）
       - name: Route 100% traffic to latest
         run: |
-          az containerapp ingress traffic set -n "$APP" -g "$RG" --revision-weight latest=100
+          # Detect revision mode (property name differs by API versions, try both)
+          MODE=$(az containerapp show -n "$APP" -g "$RG" --query "properties.configuration.activeRevisionsMode" -o tsv 2>/dev/null || true)
+          if [ -z "$MODE" ]; then
+            MODE=$(az containerapp show -n "$APP" -g "$RG" --query "properties.template.revisionMode" -o tsv 2>/dev/null || true)
+          fi
+          echo "Detected revision mode: ${MODE:-unknown}"
+
+          # Only attempt traffic split when in Multiple mode
+          if [ "${MODE,,}" = "multiple" ]; then
+            az containerapp ingress traffic set -n "$APP" -g "$RG" --revision-weight latest=100
+          else
+            echo "Single revision mode; skipping traffic split (latest already receives 100%)."
+          fi
 
       - name: Show active revisions
         run: |
