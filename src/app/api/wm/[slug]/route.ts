@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BlobServiceClient } from "@azure/storage-blob";
+import { DefaultAzureCredential } from "@azure/identity";
 import sharp from "sharp";
 
 export const runtime = "nodejs";
@@ -41,8 +42,27 @@ function svgWatermark(text: string, imgWidth: number) {
   return { svgBuffer, svgWidth, svgHeight };
 }
 
-function blobClientFromConn(conn: string) {
-  const service = BlobServiceClient.fromConnectionString(conn);
+
+function getContainerClient(log?: (...args: any[]) => void) {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (conn) {
+    log?.("auth", { mode: "conn-string" });
+    const service = BlobServiceClient.fromConnectionString(conn);
+    return service.getContainerClient(CONTAINER);
+  }
+  const account =
+    process.env.AZURE_STORAGE_ACCOUNT ||
+    process.env.STORAGE_ACCOUNT_NAME ||
+    process.env.NEXT_PUBLIC_STORAGE_ACCOUNT;
+  if (!account) {
+    throw new Error(
+      "Storage account name missing. Set AZURE_STORAGE_ACCOUNT (or STORAGE_ACCOUNT_NAME / NEXT_PUBLIC_STORAGE_ACCOUNT)."
+    );
+  }
+  log?.("auth", { mode: "managed-identity", account });
+  const url = `https://${account}.blob.core.windows.net`;
+  const credential = new DefaultAzureCredential();
+  const service = new BlobServiceClient(url, credential);
   return service.getContainerClient(CONTAINER);
 }
 
@@ -74,9 +94,6 @@ export async function GET(
 
     log("slug", slug);
 
-    const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-    log("has storage conn", Boolean(conn));
-    if (!conn) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
 
     // DB から対象写真と large 版のパスを取る
     const photo = await prisma.photo.findUnique({
@@ -90,7 +107,7 @@ export async function GET(
     const sourcePath = (large?.storagePath ?? photo.storagePath); // large 無ければオリジナル
     log("sourcePath", sourcePath, "chosenVariant", large ? "large" : "original");
 
-    const container = blobClientFromConn(conn);
+    const container = getContainerClient(log);
     const blobClient = container.getBlockBlobClient(sourcePath);
     const dl = await blobClient.download();
     const input = await streamToBuffer(dl.readableStreamBody!);
