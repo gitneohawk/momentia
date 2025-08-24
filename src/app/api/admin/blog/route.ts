@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       take: limit,
     });
-    return NextResponse.json({ posts });
+    return NextResponse.json({ posts, items: posts, total: posts.length });
   } catch (e: any) {
     if (
       e.message &&
