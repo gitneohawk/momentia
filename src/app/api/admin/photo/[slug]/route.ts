@@ -105,6 +105,11 @@ export async function DELETE(
   }
   try {
     const { slug } = await params;
+    // Structured diagnostics helper
+    const logErr = (label: string, err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.error(`[photo:DELETE] ${label} slug=${slug}`, err);
+    };
 
     // 1) DBから対象取得
     const photo = await prisma.photo.findUnique({
@@ -113,14 +118,23 @@ export async function DELETE(
     });
     if (!photo) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-    // 2) Blob削除（originals + variants）
+    // 2) Blob削除（originals + variants） — falsy を除外しつつベストエフォートで削除
     const container = await getContainer();
-    const targets = [
-      photo.storagePath, // originals/<slug>.jpg
-      ...photo.variants.map((v) => v.storagePath), // public/...
+    const targetsRaw = [
+      photo.storagePath,
+      ...photo.variants.map((v) => v.storagePath),
     ];
+    const targets = targetsRaw.filter((p): p is string => typeof p === "string" && p.length > 0);
+    const blobErrors: { path: string; error: string }[] = [];
+
     for (const p of targets) {
-      await container.getBlockBlobClient(p).deleteIfExists();
+      try {
+        await container.getBlockBlobClient(p).deleteIfExists();
+      } catch (e: any) {
+        blobErrors.push({ path: p, error: String(e?.message || e) });
+        logErr(`blob-delete-failed path=${p}`, e);
+        // 続行（DB 側の整合性を優先）。後で警告として返却。
+      }
     }
 
     // 3) DB削除（子→親の順）
@@ -128,8 +142,10 @@ export async function DELETE(
     await prisma.variant.deleteMany({ where: { photoId: photo.id } });
     await prisma.photo.delete({ where: { id: photo.id } });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, warnings: (typeof blobErrors !== "undefined" && blobErrors.length) ? { blobErrors } : undefined });
   } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error(`[photo:DELETE] unhandled slug=${(await params as any)?.slug ?? "unknown"}`, e);
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }
