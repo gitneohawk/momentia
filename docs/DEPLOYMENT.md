@@ -36,10 +36,10 @@
    ```
    az account set --subscription "<subscription-id>"
    ```
-3. Create or update Azure resources as needed (Resource Group, App Service, Storage Account).
-4. Deploy the built application to Azure App Service:
+3. Create or update Azure resources as needed (Resource Group, Container App Environment, Storage Account).
+4. Deploy the built application to Azure Container Apps:
    ```
-   az webapp up --name <app-service-name> --resource-group <resource-group> --sku F1
+   az containerapp up --name <container-app-name> --resource-group <resource-group> --environment <environment-name> --source .
    ```
 5. Configure environment variables and application settings in Azure portal or via CLI.
 6. Deploy static assets or container images to Azure Blob Storage or Container Registry if applicable.
@@ -53,6 +53,8 @@
 - **CORS Settings:** Verify that CORS rules are restricted to trusted domains.
 - **Payment Gateway Configuration:** Set correct Stripe/PayPal keys in production and configure webhook endpoints. Test both sandbox and production flows.
 - Monitor logs and performance metrics for any issues.
+
+- ✅ Custom domain configured (momentia.evoluzio.com with DNS + Container Apps binding)
 
 ---
 

@@ -1,26 +1,18 @@
-import { NextResponse } from "next/server";
-// import { auth } from "./auth"; // 使っていれば
+import { withAuth } from "next-auth/middleware";
 
-export function middleware(req: Request) {
-  const url = new URL(req.url);
-
-  // ✅ APIは通す
-  if (url.pathname.startsWith("/api")) {
-    return NextResponse.next();
+// Only require authentication; do RBAC (admin check) inside API/page handlers.
+// If you already include `role` in the JWT, you can tighten the authorized callback later.
+export default withAuth(
+  function middleware() {},
+  {
+    pages: { signIn: "/api/auth/signin" },
+    callbacks: {
+      authorized: ({ token }) => !!token, // logged-in users only
+    },
   }
+);
 
-  // ✅ 管理画面のみ保護（例）
-  if (url.pathname.startsWith("/admin")) {
-    // ここでセッションチェックしたければする
-    // const session = await auth(); // RSC auth等
-    // if (!session) return NextResponse.redirect(new URL("/api/auth/signin", url));
-    return NextResponse.next();
-  }
-
-  return NextResponse.next();
-}
-
-// ✅ matcherは /admin のみに。/api は含めないこと！
+// Run middleware only for admin UIs and admin APIs
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };

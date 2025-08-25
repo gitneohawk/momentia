@@ -1,6 +1,12 @@
 
 
+
 # Blog Mini-CMS Implementation Plan
+
+## High Priority Tasks
+1. Configure custom domain (momentia.evoluzio.com) on Azure Container Apps and DNS.
+2. Set up a separate Azure Blob container for Blog images (distinct from Gallery).
+3. Implement purchase flow from Gallery → Purchase → Stripe Checkout.
 
 ## Goal
 Implement a lightweight CMS for blog posts so that articles can be added/edited without committing to GitHub for each update.

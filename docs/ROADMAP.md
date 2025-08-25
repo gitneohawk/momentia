@@ -13,6 +13,9 @@ This roadmap outlines the key development milestones for the Momentia photo port
 - ✅ Implement user authentication and authorization.
 - ✅ Establish CI/CD pipeline for automated deployment to Azure.
 - ✅ Write unit tests for core components and API endpoints.
+- ✅ Deploy to Azure Container Apps.
+- Configure custom domain (momentia.evoluzio.com).
+- Enable blog image uploads via a separate Blob container.
 - Ship MVP purchase flow with **Stripe Checkout** (hosted page). Start with single-item “Buy now”, later expand to cart.
 - Keep print sales as **Coming Soon**; evaluate FUJIFILM WALLDECOR or domestic lab partners for framed print fulfillment.
 - Lock down **Blob** originals to **Private**; serve images via short‑lived **SAS** or server streaming; keep thumbnails cacheable.
@@ -55,7 +58,7 @@ This roadmap outlines the key development milestones for the Momentia photo port
    - Add production URL:
      ```
      https://momentia.evoluzio.com/api/auth/callback/azure-ad
-     https://momentia.azurewebsites.net/api/auth/callback/azure-ad
+     https://momentia.delightfulisland-cc05cb09.japaneast.azurecontainerapps.io/api/auth/callback/azure-ad
      ```
    - Keep local development URI:
      ```
@@ -69,8 +72,8 @@ This roadmap outlines the key development milestones for the Momentia photo port
    - `AZURE_STORAGE_CONNECTION_STRING` → Use production storage account connection string.
    - `DATABASE_URL` → Point to production PostgreSQL instance.
 
-3. **Azure App Service Configuration**
-   - Set all required environment variables in Applwication Settings.
+3. **Azure Container Apps Configuration**
+   - Set all required environment variables in Container Apps Configuration.
    - If using deployment slots (staging/prod), configure both.
 
 4. **Security Checks**
@@ -94,4 +97,4 @@ This roadmap outlines the key development milestones for the Momentia photo port
 
 _This checklist helps ensure smooth deployment and minimizes configuration errors._
 
-_Last Updated: 2025-08-18_
+_Last Updated: 2025-08-26_
