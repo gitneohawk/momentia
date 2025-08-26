@@ -75,7 +75,7 @@ export default function GalleryPage() {
 
   return (
     <div className="bg-neutral-50">
-      <section className="grid gap-10 px-4 sm:px-6 max-w-5xl md:max-w-6xl lg:max-w-7xl mx-auto py-6 sm:py-8">
+      <section className="hidden md:block grid gap-10 px-4 sm:px-6 max-w-5xl md:max-w-6xl lg:max-w-7xl mx-auto py-6 sm:py-8">
         {/* Intro Card */}
         <div className="rounded-2xl bg-gradient-to-br from-neutral-50 to-neutral-100/70 shadow-sm ring-1 ring-black/5 p-6 md:p-8 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-0 [background-image:radial-gradient(circle_at_20%_20%,rgba(0,0,0,0.03),transparent_40%),radial-gradient(circle_at_80%_0,rgba(0,0,0,0.04),transparent_35%)]" />

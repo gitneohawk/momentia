@@ -109,7 +109,7 @@ export default function Home() {
       </section>
 
       {/* Featured Works: ホバーエフェクトとデザインを更新 */}
-      <section className="py-6 sm:py-8 bg-white">
+      <section className="hidden md:block py-6 sm:py-8 bg-white">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <header className="mb-8 md:mb-8">
             <h2 className="font-serif text-3xl md:text-4xl font-medium text-neutral-900">

@@ -18,6 +18,43 @@ export const dynamic = "force-dynamic";
 const ACCOUNT = process.env.AZURE_STORAGE_ACCOUNT || "";
 const CONTAINER = "photos";
 
+function parseConnString(raw: string) {
+  const s = raw.trim().replace(/^\s*["']|["']\s*$/g, "");
+  const entries = s
+    .split(";")
+    .map((kv): [string, string] | null => {
+      const i = kv.indexOf("=");
+      if (i === -1) return null;
+      const k = kv.slice(0, i).trim();
+      const v = kv.slice(i + 1).trim();
+      return k && v ? [k, v] : null;
+    })
+    .filter((e): e is [string, string] => !!e);
+  const map = new Map<string, string>(entries);
+  const accountName = map.get("AccountName");
+  const accountKey = map.get("AccountKey");
+  if (!accountName || !accountKey) throw new Error("Invalid storage connection string");
+  const blobEndpoint = map.get("BlobEndpoint");
+  const protocol = map.get("DefaultEndpointsProtocol") || "https";
+  const endpointSuffix = map.get("EndpointSuffix") || "core.windows.net";
+  const endpoint = blobEndpoint || `${protocol}://${accountName}.blob.${endpointSuffix}`;
+  return { accountName, accountKey, endpoint };
+}
+
+function getEndpointAndCred() {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) throw new Error("missing storage connection");
+  const { accountName, accountKey, endpoint } = parseConnString(conn);
+  const cred = new StorageSharedKeyCredential(accountName, accountKey);
+  return { endpoint, cred, accountName };
+}
+
+function getPublicBase(endpoint: string) {
+  const pub = process.env.AZURE_BLOB_PUBLIC_ENDPOINT;
+  if (pub && pub.trim().length > 0) return pub.replace(/\/+$/, "");
+  return endpoint.replace(/\/+$/, "");
+}
+
 async function getSignedUrl(storagePath: string, ttlMinutes = 60): Promise<string> {
   const now = new Date();
   const startsOn = new Date(now.getTime() - 5 * 60 * 1000);
@@ -25,7 +62,12 @@ async function getSignedUrl(storagePath: string, ttlMinutes = 60): Promise<strin
 
   // MSI 経路（User Delegation SAS）
   if (process.env.AZURE_USE_MSI === "1" && ACCOUNT) {
-    const endpoint = `https://${ACCOUNT}.blob.core.windows.net`;
+    // Prefer connection string endpoint when available (AzURITE 対応)
+    let endpoint = `https://${ACCOUNT}.blob.core.windows.net`;
+    try {
+      const { endpoint: ep } = getEndpointAndCred();
+      endpoint = ep;
+    } catch {}
     const svc = new BlobServiceClient(endpoint, new DefaultAzureCredential());
     try {
       const udk = await svc.getUserDelegationKey(startsOn, expiresOn);
@@ -41,34 +83,29 @@ async function getSignedUrl(storagePath: string, ttlMinutes = 60): Promise<strin
         udk,
         ACCOUNT
       ).toString();
-      return `${endpoint}/${CONTAINER}/${encodeURI(storagePath)}?${sas}`;
+      const publicBase = getPublicBase(endpoint);
+      return `${publicBase}/${CONTAINER}/${encodeURI(storagePath)}?${sas}`;
     } catch (e) {
       console.error("[/api/admin/photos] MSI SAS error:", e);
       // フォールバックへ
     }
   }
 
-  // 共有キー（接続文字列）フォールバック
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  const m = conn?.match(/AccountName=([^;]+).*AccountKey=([^;]+)/);
-  if (m) {
-    const [, acc, key] = m;
-    const credential = new StorageSharedKeyCredential(acc, key);
-    const sas = generateBlobSASQueryParameters(
-      {
-        containerName: CONTAINER,
-        blobName: storagePath,
-        permissions: BlobSASPermissions.parse("r"),
-        startsOn,
-        expiresOn,
-        version: "2021-08-06",
-      },
-      credential
-    ).toString();
-    return `https://${acc}.blob.core.windows.net/${CONTAINER}/${encodeURI(storagePath)}?${sas}`;
-  }
-
-  throw new Error("cannot sign blob url (no MSI or connection string)");
+  // 共有キー（接続文字列）フォールバック（AzURITE の BlobEndpoint も尊重）
+  const { endpoint, cred } = getEndpointAndCred();
+  const publicBase = getPublicBase(endpoint);
+  const sas = generateBlobSASQueryParameters(
+    {
+      containerName: CONTAINER,
+      blobName: storagePath,
+      permissions: BlobSASPermissions.parse("r"),
+      startsOn,
+      expiresOn,
+      version: "2021-08-06",
+    },
+    cred
+  ).toString();
+  return `${publicBase}/${CONTAINER}/${encodeURI(storagePath)}?${sas}`;
 }
 
 export async function GET() {

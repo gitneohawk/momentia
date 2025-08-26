@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
+const isAzurite = process.env.AZURE_STORAGE_CONNECTION_STRING?.includes('devstoreaccount1') ?? false;
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   images: {
+    unoptimized: isAzurite,
     remotePatterns: [
       // Azurite / local dev
-      { protocol: "http", hostname: "127.0.0.1", port: "10000", pathname: "/devstoreaccount1/photos/**" },
       { protocol: "http", hostname: "localhost",  port: "10000", pathname: "/devstoreaccount1/photos/**" },
       // Azure Blob (production)
       { protocol: "https", hostname: "momentia1.blob.core.windows.net", pathname: "/photos/**" },

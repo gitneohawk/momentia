@@ -23,6 +23,45 @@ type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keyword
 const container = "photos";
 const ACCOUNT_FROM_ENV = process.env.AZURE_STORAGE_ACCOUNT || null;
 
+function parseConnString(raw: string) {
+  const s = raw.trim().replace(/^\s*["']|["']\s*$/g, "");
+  const entries = s
+    .split(";")
+    .map((kv): [string, string] | null => {
+      const i = kv.indexOf("=");
+      if (i === -1) return null;
+      const k = kv.slice(0, i).trim();
+      const v = kv.slice(i + 1).trim();
+      return k && v ? [k, v] : null;
+    })
+    .filter((e): e is [string, string] => !!e);
+  const map = new Map<string, string>(entries);
+  const accountName = map.get("AccountName");
+  const accountKey = map.get("AccountKey");
+  if (!accountName || !accountKey) throw new Error("Invalid storage connection string");
+  const blobEndpoint = map.get("BlobEndpoint");
+  const protocol = map.get("DefaultEndpointsProtocol") || "https";
+  const endpointSuffix = map.get("EndpointSuffix") || "core.windows.net";
+  const endpoint = blobEndpoint || `${protocol}://${accountName}.blob.${endpointSuffix}`;
+  return { accountName, accountKey, endpoint };
+}
+
+function getEndpointAndCred() {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) throw new Error("missing storage connection");
+  const { accountName, accountKey, endpoint } = parseConnString(conn);
+  const cred = new StorageSharedKeyCredential(accountName, accountKey);
+  return { endpoint, cred };
+}
+
+function getPublicBase(endpoint: string) {
+  const pub = process.env.AZURE_BLOB_PUBLIC_ENDPOINT;
+  if (pub && pub.trim().length > 0) {
+    return pub.replace(/\/+$/, "");
+  }
+  return endpoint.replace(/\/+$/, "");
+}
+
 export async function GET(req: Request) {
   const t0 = Date.now();
   const searchParams = new URL(req.url).searchParams;
@@ -57,7 +96,12 @@ export async function GET(req: Request) {
     // MSI (AAD) 経路: User Delegation SAS を手動生成
     if (process.env.AZURE_USE_MSI === "1") {
       if (!ACCOUNT) return null;
-      const endpoint = `https://${ACCOUNT}.blob.core.windows.net`;
+      // Prefer connection string endpoint when available (mainly for local Azurite won't use MSI, but keep logic consistent)
+      let endpoint = `https://${ACCOUNT}.blob.core.windows.net`;
+      try {
+        const { endpoint: ep } = getEndpointAndCred();
+        endpoint = ep;
+      } catch {}
       const svc = new BlobServiceClient(endpoint, new DefaultAzureCredential());
       try {
         const udk = await svc.getUserDelegationKey(startsOn, expiresOn);
@@ -73,28 +117,34 @@ export async function GET(req: Request) {
           udk,
           ACCOUNT
         ).toString();
-        return `${endpoint}/${container}/${encodeURI(storagePath)}?${sas}`;
+        const publicBase = getPublicBase(endpoint);
+        return `${publicBase}/${container}/${encodeURI(storagePath)}?${sas}`;
       } catch (e) {
         console.error("[/api/photos] user-delegation-sas error", e);
         // フォールバックに続く
       }
     }
 
-    // Fallback: Shared Key (接続文字列) での SAS 生成
-    if (!ACC || !KEY) return null;
-    const credential = new StorageSharedKeyCredential(ACC, KEY);
-    const sas = generateBlobSASQueryParameters(
-      {
-        containerName: container,
-        blobName: storagePath,
-        permissions: BlobSASPermissions.parse("r"),
-        startsOn,
-        expiresOn,
-        version: "2021-08-06",
-      },
-      credential
-    ).toString();
-    return `https://${ACC}.blob.core.windows.net/${container}/${encodeURI(storagePath)}?${sas}`;
+    // Fallback: Shared Key (接続文字列) での SAS 生成（AzURITE の BlobEndpoint も尊重）
+    try {
+      const { endpoint, cred } = getEndpointAndCred();
+      const sas = generateBlobSASQueryParameters(
+        {
+          containerName: container,
+          blobName: storagePath,
+          permissions: BlobSASPermissions.parse("r"),
+          startsOn,
+          expiresOn,
+          version: "2021-08-06",
+        },
+        cred
+      ).toString();
+      const publicBase = getPublicBase(endpoint);
+      return `${publicBase}/${container}/${encodeURI(storagePath)}?${sas}`;
+    } catch (e) {
+      console.error("[/api/photos] shared-key-sas error", e);
+      return null;
+    }
   };
 
   console.info("[/api/photos] request", { q, kw, limit });

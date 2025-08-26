@@ -15,7 +15,7 @@ const PUB_PREFIX = "public/";
 const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT || "momentiastorage";
 
 function parseConnString(raw: string) {
-  const s = raw.trim().replace(/^\s*['"]|['"]\s*$/g, ""); // 前後のクォート/空白を剥がす
+  const s = raw.trim().replace(/^\s*['"]|['"]\s*$/g, ""); // strip quotes/whitespace
   const entries = s
     .split(";")
     .map((kv): [string, string] | null => {
@@ -26,21 +26,40 @@ function parseConnString(raw: string) {
       return key && val ? [key, val] : null;
     })
     .filter((e): e is [string, string] => !!e);
+
   const map = new Map<string, string>(entries);
+
   const accountName = map.get("AccountName");
   const accountKey  = map.get("AccountKey");
+  const blobEndpoint = map.get("BlobEndpoint");
+
+  if (!accountName || !accountKey) {
+    throw new Error("Invalid storage connection string (missing AccountName/AccountKey)");
+  }
+
+  // If an explicit BlobEndpoint is provided (e.g., Azurite: http://host.docker.internal:10000/devstoreaccount1), use it.
+  if (blobEndpoint && blobEndpoint.length > 0) {
+    return { accountName, accountKey, endpoint: blobEndpoint };
+  }
+
+  // Fallback to public Azure endpoint
   const protocol    = map.get("DefaultEndpointsProtocol") || "https";
   const endpointSuffix = map.get("EndpointSuffix") || "core.windows.net";
-  if (!accountName || !accountKey) throw new Error("Invalid storage connection string (missing AccountName/AccountKey)");
   const endpoint = `${protocol}://${accountName}.blob.${endpointSuffix}`;
   return { accountName, accountKey, endpoint };
 }
 
 function makeBlobService(rawConn: string) {
+  // If the connection string specifies BlobEndpoint (e.g., Azurite), let the SDK parse & honor it.
+  if (/(^|;)BlobEndpoint=/i.test(rawConn)) {
+    return BlobServiceClient.fromConnectionString(rawConn, {
+      retryOptions: { maxTries: 3 },
+    });
+  }
+  // Otherwise, build endpoint from parts.
   const { accountName, accountKey, endpoint } = parseConnString(rawConn);
   const cred = new StorageSharedKeyCredential(accountName, accountKey);
   return new BlobServiceClient(endpoint, cred, {
-    // 任意：再試行やタイムアウトを好みに
     retryOptions: { maxTries: 3 },
   });
 }

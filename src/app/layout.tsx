@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "./providers";
@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   ...(_base ? { metadataBase: new URL(_base) } : {}),
   title: "Momentia",
   description: "Momentia — A photo portfolio & sales platform",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
