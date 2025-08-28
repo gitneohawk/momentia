@@ -34,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja" className={`${inter.variable} ${lora.variable} antialiased`} style={{ backgroundColor: "#fafafa", colorScheme: "light" }}>
+    <html lang="ja" className={`${inter.variable} ${lora.variable} antialiased`}>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-neutral-50 text-neutral-900`}>
         <Providers>
         <header className="border-b border-neutral-200/80 bg-white">
