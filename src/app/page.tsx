@@ -45,12 +45,13 @@ export default function Home() {
       <section className="relative h-[58vh] md:h-[60vh] min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
         {/* 背景画像: publicフォルダからのパスを指定してください */}
         <Image
-          src="/hero-image.avif"
-          alt="Hero background"
-          fill
-          className="object-cover z-0"
-          priority
-        />
+  src="/hero-image.webp"
+  alt="Hero Image"
+  width={1920}
+  height={1080} // 実際の比率に合わせて
+  priority
+  className="w-full h-auto object-cover"
+/>
         {/* 背景オーバーレイ */}
         <div className="absolute inset-0 bg-black/30 z-10" />
 

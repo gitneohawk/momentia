@@ -120,7 +120,10 @@ export default function GalleryPage() {
             rowConstraints={{ minPhotos: 2, maxPhotos: 3 }}
             onClick={({ index }) => setIndex(index)}
             componentsProps={{
-              image: { className: "m-2 sm:m-3 rounded-2xl shadow-md ring-1 ring-black/5 bg-white/95 transition-transform duration-300 hover:scale-[1.01] hover:shadow-xl overflow-hidden" },
+              image: {
+                className:
+                  "m-2 sm:m-3 rounded-2xl shadow-md ring-1 ring-black/5 bg-white/95 transition-transform duration-300 hover:scale-[1.01] hover:shadow-xl overflow-hidden",
+              },
             }}
           />
         )}
