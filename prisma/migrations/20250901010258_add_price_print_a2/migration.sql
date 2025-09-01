@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "public"."Photo" ADD COLUMN     "pricePrintA2JPY" INTEGER NOT NULL DEFAULT 50000,
+ALTER COLUMN "priceDigitalJPY" SET DEFAULT 10000;

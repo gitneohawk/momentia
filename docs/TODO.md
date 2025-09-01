@@ -1,6 +1,3 @@
-
-
-
 # Blog Mini-CMS Implementation Plan
 
 ## High Priority Tasks
@@ -61,8 +58,8 @@ Implement a lightweight CMS for blog posts so that articles can be added/edited 
 
 ## Mobile UX & Perf
 
-- [ ] Landing: Featured Works（モバイル）
-  - [ ] A案: スマホでは非表示（`hidden md:block`）
+- [x] Landing: Featured Works（モバイル）
+  - [x] A案: スマホでは非表示（`hidden md:block`） (implemented and deployed)
   - [ ] B案: 2列グリッド（最大4枚）＋「もっと見る」→ /gallery
   - [ ] サムネ `sizes="(max-width: 640px) 50vw, 33vw"`
 
@@ -71,12 +68,14 @@ Implement a lightweight CMS for blog posts so that articles can be added/edited 
   - [ ] `/api/wm/[slug]` は存在チェック→あれば302、無ければ生成→保存→302
   - [ ] Blob に `Cache-Control: public, max-age=31536000, immutable`
   - [ ] ファイル名に `wm` のバージョンを含める（例 `_wm-v2_`）
+  - Note: 現状は表示時に生成、Upload時生成は未実装
 
 - [ ] Landing: Hero 画像最適化
   - [ ] 出力幅: 640/960/1280/1600/1920 を生成（AVIF/WebP優先）
   - [ ] `<Image priority sizes="(max-width:640px) 100vw, (max-width:1024px) 90vw, 1200px">`
   - [ ] blurDataURL プレースホルダを設定
   - [ ] 目標: LCP画像 < 200KB
+  - Note: 1920px WebP/JPEG optimized image deployed; responsive multi-size and blurDataURL pending
 
 - [ ] Gallery 体験
   - [ ] 初期ロードを12枚に制限、以降“もっと見る”で追加ロード
@@ -87,3 +86,15 @@ Implement a lightweight CMS for blog posts so that articles can be added/edited 
   - [ ] public画像: CDN長期キャッシュ
   - [ ] `/api/photos`: `s-maxage=60, stale-while-revalidate=600`
   - [ ] SAS TTL: thumb/large=30–60分、wm=24h
+
+- [ ] Lightbox 2048対応
+  - [ ] 2048pxはPC向けのみ提供、モバイルは480pxを利用
+  - [ ] 将来的に1024px variantを追加してsrcset対応
+  - [ ] /api/photos: largeはSAS発行に切替、thumbは公開URLのまま
+  - Note: 初期対応はモバイルでの速度優先、セキュリティ確保のため2048は非公開運用
+
+## Deployment / Ops Notes
+
+- [ ] Ensure background color is fixed light (`globals.css` with `color-scheme: light`, `min-height: 100svh`)
+- [ ] Verify mobile layout after deployment (Pixel9a実機確認済み)
+- [ ] Monitor ACA metrics; consider Front Door for CDN/Access logs

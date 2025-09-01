@@ -21,7 +21,8 @@ model Photo {
   variants    Variant[]
   keywords    Keyword[]
   published   Boolean  @default(false)
-  priceDigitalJPY Int @default(5000)
+  priceDigitalJPY Int @default(10000)
+  pricePrintA2JPY Int @default(50000)
 }
 
 model Variant {

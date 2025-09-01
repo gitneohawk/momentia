@@ -36,7 +36,8 @@ export async function GET(
       height: p.height,
       caption: p.caption,
       keywords: p.keywords.map(k => k.word),
-      priceDigitalJPY: p.priceDigitalJPY ?? 3000,
+      priceDigitalJPY: p.priceDigitalJPY ?? 10000,
+      pricePrintA2JPY: p.pricePrintA2JPY ?? 50000,
       urls: {
         original: base + p.storagePath,
         thumb: thumb ? base + thumb.storagePath : null,

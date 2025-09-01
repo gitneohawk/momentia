@@ -30,6 +30,18 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prisma migrate deploy (PROD)
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          npm ci --include=dev
+          npx prisma migrate deploy
+
       # ACR でクラウドビルド（amd64ネイティブ、高速・安定）
       - name: Build image on ACR
         run: |
