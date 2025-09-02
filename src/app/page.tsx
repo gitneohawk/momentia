@@ -175,8 +175,7 @@ export default function Home() {
                   Momentiaについて
                 </h3>
                 <p className="mt-2 text-neutral-600 leading-relaxed">
-                  Momentia は Evoluzio Inc. が運営する写真レーベル。作品づくりの背景や制作プロセス、
-                  額装の方針などを短くまとめました。詳しくはプロフィールページへ。
+                  Momentia は Evoluzio Inc. が運営する写真レーベル。詳しくはプロフィールページへ。
                 </p>
                 <div className="mt-4 inline-flex items-center gap-2 text-neutral-900 font-medium">
                   もっと見る

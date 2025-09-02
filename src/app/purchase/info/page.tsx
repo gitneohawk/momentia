@@ -8,7 +8,6 @@ export default function PurchaseInfo() {
       <ul className="list-disc list-inside mb-6 text-gray-700 space-y-2">
         <li>高品質プリントのご注文</li>
         <li>デジタルダウンロード</li>
-        <li>額装オプション</li>
       </ul>
       <p className="text-gray-600">
         特別なご要望がございましたら、お気軽にお問い合わせくださいませ。
