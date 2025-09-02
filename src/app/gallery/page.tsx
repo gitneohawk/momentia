@@ -148,8 +148,7 @@ export default function GalleryPage() {
                     <div className="text-left text-[12px] text-white hidden sm:block">
                       {active.caption && <div className="font-medium line-clamp-1">{active.caption}</div>}
                       <div className="text-white/85">
-                        {active.width}×{active.height} px・DL ¥
-                        {((active.priceDigitalJPY ?? 10000) as number).toLocaleString()}
+                        {active.width}×{active.height} px
                       </div>
                     </div>
                     <button
