@@ -19,9 +19,9 @@ type PhotoItem = {
 export default async function PurchaseSuccessPage({
   searchParams,
 }: {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const sp = searchParams;
+  const sp = await searchParams;
   let slug = (sp?.slug as string | undefined) ?? undefined;
   const sessionId = (sp?.session_id as string | undefined) ?? undefined;
 
