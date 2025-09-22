@@ -1,5 +1,9 @@
 // src/app/purchase/success/page.tsx
 import { headers } from "next/headers";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic"; // 完全に動的レンダリング
+export const revalidate = 0; // 再検証しない（キャッシュ無効）
 
 type PhotoItem = {
   slug: string;
@@ -15,25 +19,37 @@ type PhotoItem = {
 export default async function PurchaseSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const sp = await searchParams;
-  const slug = (sp?.slug as string | undefined) ?? undefined;
+  const sp = searchParams;
+  let slug = (sp?.slug as string | undefined) ?? undefined;
   const sessionId = (sp?.session_id as string | undefined) ?? undefined;
+
+  // URL に slug が無い場合は、webhook で保存済みの Order から解決
+  if (!slug && sessionId) {
+    const order = await prisma.order.findUnique({
+      where: { sessionId },
+      select: { slug: true },
+    });
+    slug = order?.slug ?? undefined;
+  }
 
   let item: PhotoItem | null = null;
   if (slug) {
-    const hdrs = await headers();
+    const hdrs = headers();
     const base = process.env.NEXT_PUBLIC_BASE_URL ?? `http://${hdrs.get("host")}`;
     try {
-      const res = await fetch(`${base}/api/photos?kw=${encodeURIComponent(slug)}&limit=1`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `${base}/api/photos?kw=${encodeURIComponent(slug)}&limit=1`,
+        { cache: "no-store" }
+      );
       if (res.ok) {
         const json = (await res.json()) as { items?: PhotoItem[] };
-        item = (json?.items && json.items.length > 0) ? json.items[0] : null;
+        item = json?.items && json.items.length > 0 ? json.items[0] : null;
       }
-    } catch {}
+    } catch {
+      // noop
+    }
   }
 
   return (
@@ -58,12 +74,12 @@ export default async function PurchaseSuccessPage({
         </div>
       )}
 
-      {/* {slug && !item && (
+      {slug && !item && (
         <div>
           <h2 className="text-lg font-medium mb-1">Not found</h2>
           <p className="text-sm text-neutral-600">この写真は見つからないか、非公開です。</p>
         </div>
-      )} */}
+      )}
 
       <div className="grid gap-2 text-sm text-neutral-700">
         <p>・デジタル商品: 決済確認後、ダウンロードリンクをメールでお送りします（準備中）。</p>
