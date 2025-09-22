@@ -1,100 +1,101 @@
-# Momentia Development Roadmap
+# Momentia 開発ロードマップ
 
-This roadmap outlines the key development milestones for the Momentia photo portfolio project. It serves as a guide to ensure continuity and clarity across different development sessions and among various contributors. By following this roadmap, we aim to systematically build, enhance, and maintain the platform with a focus on scalability, usability, and integration with modern technologies.
+このロードマップは、Momentia 写真ポートフォリオプロジェクトの主要な開発マイルストーンを示しています。異なる開発セッションや複数の貢献者間での継続性と明確さを確保するためのガイドとして機能します。このロードマップに従うことで、スケーラビリティ、使いやすさ、最新技術との統合に重点を置きながら、プラットフォームを体系的に構築、強化、維持することを目指します。
 
-## Short-term Goals (1–2 months)
+## 短期目標（1～2ヶ月）
 
-- ✅ Set up the Next.js project structure and initial configuration.
-- ✅ Integrate Azure Blob Storage for photo uploads and storage.
-- ✅ Implement image upload UI with drag-and-drop functionality.
-- ✅ Develop basic photo gallery display with pagination.
-- ✅ Set up PostgreSQL database schema for storing photo metadata.
-- ✅ Create API routes in Next.js for CRUD operations on photo metadata.
-- ✅ Implement user authentication and authorization.
-- ✅ Establish CI/CD pipeline for automated deployment to Azure.
-- ✅ Write unit tests for core components and API endpoints.
-- ✅ Deploy to Azure Container Apps.
-- Configure custom domain (momentia.evoluzio.com).
-- Enable blog image uploads via a separate Blob container.
-- Ship MVP purchase flow with **Stripe Checkout** (hosted page). Start with single-item “Buy now”, later expand to cart.
-- Keep print sales as **Coming Soon**; evaluate FUJIFILM WALLDECOR or domestic lab partners for framed print fulfillment.
-- Lock down **Blob** originals to **Private**; serve images via short‑lived **SAS** or server streaming; keep thumbnails cacheable.
-- Add basic **watermark** for lightbox previews (server-side, tunable via env).
+- ✅ Next.js プロジェクト構造と初期設定のセットアップ。
+- ✅ Azure Blob Storage を写真のアップロードと保存に統合。
+- ✅ ドラッグ＆ドロップ機能を備えた画像アップロードUIの実装。
+- ✅ ページネーション付きの基本的な写真ギャラリー表示の開発。
+- ✅ 写真メタデータを保存するための PostgreSQL データベーススキーマの設定。
+- ✅ Next.js で写真メタデータの CRUD 操作用 API ルートの作成。
+- ✅ ユーザー認証と認可の実装。
+- ✅ Azure への自動デプロイのための CI/CD パイプラインの確立。
+- ✅ コアコンポーネントと API エンドポイントの単体テスト作成。
+- ✅ Azure Container Apps へのデプロイ。
+- カスタムドメイン（momentia.evoluzio.com）の設定。
+- ブログ画像アップロード用の別の Blob コンテナの有効化。
+- ✅ MVP 購入フローの Stripe Checkout（ホスト型ページ）対応完了。単一アイテムの「今すぐ購入」から開始し、後にカート機能拡張予定。
+- ✅ 注文ステータス管理の実装完了。
+- プリント販売は「近日公開」とし、FUJIFILM WALLDECOR または国内ラボパートナーによる額装プリントのフルフィルメントを評価。
+- Blob のオリジナルをプライベートにロックダウンし、短期間有効な SAS またはサーバーストリーミングで画像を提供。サムネイルはキャッシュ可能に維持。
+- ライトボックスプレビュー用の基本的なウォーターマークを追加（サーバーサイド、環境変数で調整可能）。
 
-## Mid-term Goals (3–6 months)
+## 中期目標（3～6ヶ月）
 
-- Enhance photo gallery with filtering and sorting capabilities.
-- Integrate AI-based caption and keyword generation for uploaded photos using Azure Cognitive Services.
-- Implement photo editing features such as cropping and resizing.
-- Add user profile management and personalized galleries.
-- Optimize image loading using Next.js Image component and Azure CDN.
-- Develop analytics dashboard to track photo views and user engagement.
-- Improve security with role-based access control and data validation.
-- Conduct performance testing and optimize database queries.
-- Expand test coverage with integration and end-to-end tests.
-- Add **PayPal** as an alternative payment method; **Amazon Pay** to be evaluated post‑launch.
-- Strengthen security: **CSP** hardening, API **rate limiting**, upload size caps; introduce basic WAF rules.
+- フィルタリングおよびソート機能を備えた写真ギャラリーの強化。
+- Azure Cognitive Services を用いたアップロード写真の AI ベースのキャプションおよびキーワード生成の統合。
+- クロッピングやリサイズなどの写真編集機能の実装。
+- ユーザープロファイル管理とパーソナライズされたギャラリーの追加。
+- Next.js の Image コンポーネントと Azure CDN を使用した画像読み込みの最適化。
+- 写真ビュー数およびユーザーエンゲージメントを追跡する分析ダッシュボードの開発。
+- 役割ベースのアクセス制御およびデータ検証によるセキュリティの強化。
+- パフォーマンステストの実施とデータベースクエリの最適化。
+- 統合テストおよびエンドツーエンドテストによるテストカバレッジの拡大。
+- 代替決済手段としての PayPal の追加。Amazon Pay はローンチ後に評価予定。
+- セキュリティ強化：CSP ハードニング、API レートリミット、アップロードサイズ制限の導入。基本的な WAF ルールの追加。
 
-## Long-term Goals (6+ months)
+## 長期目標（6ヶ月以上）
 
-- Introduce collaborative features such as shared albums and comments.
-- Implement advanced AI features like automatic photo tagging and content moderation.
-- Develop mobile app integration or PWA support for offline access.
-- Scale infrastructure to support large user base and high traffic.
-- Integrate with other cloud services for backup and disaster recovery.
-- Continuously update UI/UX based on user feedback and usability studies.
-- Explore monetization options such as premium accounts or print services.
-- Maintain comprehensive documentation for developers and users.
-- Plan and execute regular security audits and compliance checks.
+- 共有アルバムやコメントなどのコラボレーション機能の導入。
+- 自動写真タグ付けやコンテンツモデレーションなどの高度な AI 機能の実装。
+- オフラインアクセス対応のモバイルアプリ統合または PWA サポートの開発。
+- 大規模ユーザーベースおよび高トラフィックをサポートするためのインフラ拡張。
+- バックアップおよび災害復旧のための他クラウドサービスとの統合。
+- ユーザーフィードバックやユーザビリティ調査に基づく UI/UX の継続的更新。
+- プレミアムアカウントやプリントサービスなどの収益化オプションの検討。
+- 開発者およびユーザー向けの包括的なドキュメントの維持。
+- 定期的なセキュリティ監査およびコンプライアンスチェックの計画と実施。
 
-## Deployment & Operations Checklist
+## デプロイ＆運用チェックリスト
 
-### Deployment & Operations Checklist
+### デプロイ＆運用チェックリスト
 
-> **Note:** When deploying to Azure for public release, ensure blob storage containers for originals are set to Private and served via API or short-lived SAS.
+> **注意:** 公開リリースのために Azure にデプロイする際は、オリジナルの Blob ストレージコンテナをプライベートに設定し、API または短期間有効な SAS 経由で提供してください。
 
-#### Azure & Entra ID Setup
-1. **Entra ID Redirect URIs**
-   - Add production URL:
+#### Azure & Entra ID セットアップ
+1. **Entra ID リダイレクト URI**
+   - 本番 URL を追加：
      ```
      https://momentia.evoluzio.com/api/auth/callback/azure-ad
      https://momentia.delightfulisland-cc05cb09.japaneast.azurecontainerapps.io/api/auth/callback/azure-ad
      ```
-   - Keep local development URI:
+   - ローカル開発用 URI は維持：
      ```
      http://localhost:3000/api/auth/callback/azure-ad
      ```
-   - If using custom domains, register them in Entra ID as additional redirect URIs.
+   - カスタムドメインを使用する場合は、追加のリダイレクト URI として Entra ID に登録。
 
-2. **Environment Variables**
-   - `NEXTAUTH_URL` → Set to production URL.
-   - `AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`, `AZURE_AD_TENANT_ID` → Match values from Azure portal.
-   - `AZURE_STORAGE_CONNECTION_STRING` → Use production storage account connection string.
-   - `DATABASE_URL` → Point to production PostgreSQL instance.
+2. **環境変数**
+   - `NEXTAUTH_URL` → 本番 URL に設定。
+   - `AZURE_AD_CLIENT_ID`、`AZURE_AD_CLIENT_SECRET`、`AZURE_AD_TENANT_ID` → Azure ポータルの値に合わせる。
+   - `AZURE_STORAGE_CONNECTION_STRING` → 本番ストレージアカウントの接続文字列を使用。
+   - `DATABASE_URL` → 本番 PostgreSQL インスタンスを指す。
 
-3. **Azure Container Apps Configuration**
-   - Set all required environment variables in Container Apps Configuration.
-   - If using deployment slots (staging/prod), configure both.
+3. **Azure Container Apps 設定**
+   - 必要なすべての環境変数を Container Apps 設定にセット。
+   - デプロイメントスロット（ステージング／本番）を使用する場合は両方設定。
 
-4. **Security Checks**
-   - Ensure role-based access control is enabled where required.
-   - Validate that admin pages are behind authentication.
-   - Remove any development/test accounts.
+4. **セキュリティチェック**
+   - 必要な箇所で役割ベースアクセス制御が有効になっていることを確認。
+   - 管理ページが認証の背後にあることを検証。
+   - 開発／テストアカウントを削除。
 
-5. **Payments (MVP – Stripe Checkout)**
-   - Create **Product** and **Price** in Stripe Dashboard (JPY).
-   - Server route: `/api/checkout/create` → creates Checkout Session with success/cancel URLs.
-   - Webhook: handle `checkout.session.completed` → mark order paid, issue license/SAS for download, email receipt.
-   - Environment: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBKEY`.
-   - Test cardsを用いた本番前テスト（3Dセキュア含む）。
+5. **決済（MVP – Stripe Checkout）**
+   - Stripe ダッシュボードで **Product** と **Price** を作成（JPY）。
+   - サーバールート：`/api/checkout/create` → 成功／キャンセル URL 付きの Checkout セッションを作成。
+   - Webhook：`checkout.session.completed` を処理 → 注文を支払い済みにマークし、ライセンス／ダウンロード用 SAS を発行、領収書メール送信。
+   - 環境変数：`STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`NEXT_PUBLIC_STRIPE_PUBKEY`。
+   - Test cards を用いた本番前テスト（3Dセキュア含む）。
 
-6. **Final Verification**
-   - Test the authentication flow in production.
-   - Verify image uploads and gallery display.
-   - Confirm that CDN caching works as expected.
+6. **最終確認**
+   - 本番環境で認証フローをテスト。
+   - 画像アップロードとギャラリー表示を検証。
+   - CDN キャッシュが期待通りに機能することを確認。
 
 ---
 
-_This checklist helps ensure smooth deployment and minimizes configuration errors._
+_このチェックリストはスムーズなデプロイを支援し、設定ミスを最小限に抑えます。_
 
-_Last Updated: 2025-08-26_
+_最終更新日: 2025-09-19_

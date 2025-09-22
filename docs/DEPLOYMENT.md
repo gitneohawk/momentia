@@ -1,70 +1,72 @@
-# Deployment Guide for Momentia
+# Momentia デプロイメントガイド
 
-## Prerequisites
-- Ensure you have an active Azure account with appropriate permissions.
-- Install Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
-- Install Docker if building container images locally: https://docs.docker.com/get-docker/
-- Ensure Node.js and npm are installed for local builds.
-- Access to the project repository and necessary environment variables for deployment.
-- Ensure `.env` file is properly set up with required keys (Azure Blob, Entra ID, Stripe/PayPal keys, etc.). Refer to `.env.sample` for guidance.
+最終更新日: 2025-09-19
 
-## Local Build Steps
-1. Clone the repository if not already done:
+## 前提条件
+- 適切な権限を持つ Azure アカウントが有効であること
+- Azure CLI をインストール済み: https://docs.microsoft.com/ja-jp/cli/azure/install-azure-cli
+- コンテナイメージをローカルでビルドする場合は Docker をインストール: https://docs.docker.com/get-docker/
+- Node.js と npm がローカルビルド用にインストールされていること
+- プロジェクトリポジトリへのアクセス権およびデプロイに必要な環境変数が揃っていること
+- `.env` ファイルが必要なキー（Azure Blob, Entra ID, Stripe キー等）で正しくセットアップされていること。`.env.sample` を参照してください。
+
+## ローカルビルド手順
+1. リポジトリをクローン（未取得の場合）:
    ```
    git clone <repository-url>
    cd momentia
    ```
-2. Install dependencies:
+2. 依存パッケージのインストール:
    ```
    npm install
    ```
-3. Build the project:
+3. プロジェクトのビルド:
    ```
    npm run build
    ```
-4. (Optional) Run tests to verify build integrity:
+4. （任意）テストの実行:
    ```
    npm test
    ```
 
-## Azure Deployment Steps
-1. Log in to Azure CLI:
+## Azure へのデプロイ手順
+1. Azure CLI にログイン:
    ```
    az login
    ```
-2. Set the subscription if necessary:
+2. 必要に応じてサブスクリプションを指定:
    ```
    az account set --subscription "<subscription-id>"
    ```
-3. Create or update Azure resources as needed (Resource Group, Container App Environment, Storage Account).
-4. Deploy the built application to Azure Container Apps:
+3. 必要な Azure リソース（リソースグループ、Container App 環境、ストレージアカウント等）の作成または更新
+4. ビルド済みアプリケーションを Azure Container Apps へデプロイ:
    ```
    az containerapp up --name <container-app-name> --resource-group <resource-group> --environment <environment-name> --source .
    ```
-5. Configure environment variables and application settings in Azure portal or via CLI.
-6. Deploy static assets or container images to Azure Blob Storage or Container Registry if applicable.
+5. Azure ポータルまたは CLI で環境変数・アプリ設定を構成
+6. 静的アセットやコンテナイメージを必要に応じて Azure Blob Storage または Container Registry へデプロイ
 
-## Post-Deployment Tasks
-- Verify the application is running correctly by accessing the deployed URL.
-- Update `ROADMAP.md` flags to reflect the new deployment status.
-- Test the purchase flow thoroughly to ensure no regressions.
-- **Secure Blob Storage URLs:** Ensure Azure Blob containers are set to *Private*. Prevent direct public access to image URLs. Use Shared Access Signatures (SAS tokens) with short expiry or serve images via protected routes.
-- **HTTPS/TLS Enforcement:** Confirm HTTPS-only access is enforced in App Service.
-- **CORS Settings:** Verify that CORS rules are restricted to trusted domains.
-- **Payment Gateway Configuration:** Set correct Stripe/PayPal keys in production and configure webhook endpoints. Test both sandbox and production flows.
-- Monitor logs and performance metrics for any issues.
+## デプロイ後の確認事項
+- デプロイ先 URL でアプリケーションが正しく動作するか確認
+- `ROADMAP.md` のフラグを最新状態に更新
+- 購入フローを Stripe サンドボックスキーで検証済みであることを明記し、問題がないか再度テスト
+- **Blob Storage のセキュリティ:** Azure Blob コンテナが *Private* になっていることを確認。画像URLへの直接アクセスを防止し、SASトークン（短期間有効）や保護されたルート経由で画像を配信
+- **HTTPS/TLS の強制:** App Service で HTTPS のみアクセス可能であることを確認
+- **CORS 設定:** 信頼できるドメインのみに CORS を制限していることを確認
+- **決済ゲートウェイ（Stripe）設定:** Stripe の本番・サンドボックスキーが正しく設定され、Webhook エンドポイントも構成済みであること。サンドボックス/本番両方のフローで動作確認済み
+- ログやパフォーマンスメトリクスを監視し、問題があれば対応
 
-- ✅ Custom domain configured (momentia.evoluzio.com with DNS + Container Apps binding)
+- ✅ カスタムドメイン設定済み（momentia.evoluzio.com, DNS + Container Apps バインディング）
 
 ---
 
-Following these steps will help ensure a smooth deployment and secure operation of the Momentia project.
+上記の手順に従うことで、Momentia プロジェクトの安全かつ円滑なデプロイ・運用が可能です。
 
-## Deployment Checklist
-- ✅ Application is accessible via deployed URL
-- ✅ Login/Session works correctly (Entra ID)
-- ✅ Purchase flow verified with sandbox keys
-- ✅ Stripe/PayPal webhooks configured
-- ✅ Images in Blob Storage are not directly accessible
-- ✅ HTTPS-only and CORS policies enforced
-- ✅ Monitoring/alerts configured in Azure (App Insights or equivalent)
+## デプロイチェックリスト
+- ✅ デプロイ済み URL でアプリケーションがアクセス可能
+- ✅ ログイン/セッション（Entra ID）が正常に動作
+- ✅ Stripe サンドボックスキーで購入フローを検証済み
+- ✅ Stripe Webhook が構成済み
+- ✅ Blob Storage 内の画像が直接アクセス不可
+- ✅ HTTPS のみ・CORS ポリシーが適用されている
+- ✅ Azure（App Insights等）でモニタリング・アラートが設定済み

@@ -57,6 +57,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="mt-16 border-t border-neutral-200/80">
           <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-neutral-500 flex items-center justify-between bg-white">
             <span>© {new Date().getFullYear()} Evoluzio Inc.</span>
+            <div className="flex gap-4">
+              <Link href="/legal/license" className="hover:text-neutral-900 transition">ライセンス</Link>
+              <Link href="/legal/terms" className="hover:text-neutral-900 transition">利用規約</Link>
+              <Link href="/legal/privacy" className="hover:text-neutral-900 transition">プライバシー</Link>
+            </div>
             <a href="https://evoluzio.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:opacity-90 transition">
               <span>Powered by</span>
               <img src="/logos/Evoluzio_Logo.png" alt="Evoluzio Inc." className="h-5 w-auto" />

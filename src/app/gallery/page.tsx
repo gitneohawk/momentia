@@ -70,8 +70,8 @@ export default function GalleryPage() {
   }, [visibleItems]);
 
   const active = index >= 0 ? visibleItems[index] : null;
-  const priceDigital = (active?.priceDigitalJPY ?? 10000) as number;
-  const pricePrintA2 = (active?.pricePrintA2JPY ?? 50000) as number;
+  const priceDigital = (active?.priceDigitalJPY ?? 11000) as number;
+  const pricePrintA2 = (active?.pricePrintA2JPY ?? 55000) as number;
 
   return (
     <div className="bg-neutral-50">

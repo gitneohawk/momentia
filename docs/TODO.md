@@ -1,16 +1,18 @@
-# Blog Mini-CMS Implementation Plan
+# ブログ用ミニCMS実装計画
 
-## High Priority Tasks
-1. Configure custom domain (momentia.evoluzio.com) on Azure Container Apps and DNS.
-2. Set up a separate Azure Blob container for Blog images (distinct from Gallery).
-3. Implement purchase flow from Gallery → Purchase → Stripe Checkout.
+## 優先度が高いタスク
+1. Azure Container AppsとDNSでカスタムドメイン（momentia.evoluzio.com）を設定
+2. ブログ画像用に別のAzure Blobコンテナを用意（ギャラリーとは別）
+3. 決済フローを実装（Stripe Checkoutによる国内消費税対応、日本限定を優先。PayPalは後でオプションとして追加）
+4. 問い合わせフォームの実装（注文IDを紐付け、管理画面で確認可能にする）
+5. [x] 注文ステータス管理（paid/processing/shipped/canceled）と管理画面からの更新機能（完了）
 
-## Goal
-Implement a lightweight CMS for blog posts so that articles can be added/edited without committing to GitHub for each update.
+## 目的
+記事を追加・編集するたびにGitHubへコミットせずに済む、軽量なブログ用CMSを実装する。
 
-## Tasks
-1. **Database Setup**
-   - Add `Post` model to Prisma schema with fields:
+## タスク
+1. **データベース設定**
+   - Prismaスキーマに`Post`モデルを追加し、以下のフィールドを設定:
      - id (string, cuid)
      - title (string)
      - slug (string, unique)
@@ -21,66 +23,72 @@ Implement a lightweight CMS for blog posts so that articles can be added/edited 
      - date (DateTime)
      - published (boolean, default: false)
      - createdAt / updatedAt (DateTime)
-   - Run `prisma migrate dev` to update database.
+   - `prisma migrate dev`を実行してデータベースを更新
 
-2. **API Endpoints**
-   - `GET /api/blog` → list posts (with pagination, filter by published)
-   - `GET /api/blog/[slug]` → fetch single post
-   - `POST /api/blog` → create post (admin only)
-   - `PUT /api/blog/[id]` → update post (admin only)
-   - `DELETE /api/blog/[id]` → delete post (admin only)
+2. **APIエンドポイント**
+   - `GET /api/blog` → 記事一覧取得（ページネーション、公開済みのみフィルタリング）
+   - `GET /api/blog/[slug]` → 単一記事取得
+   - `POST /api/blog` → 記事作成（管理者のみ）
+   - `PUT /api/blog/[id]` → 記事更新（管理者のみ）
+   - `DELETE /api/blog/[id]` → 記事削除（管理者のみ）
 
-3. **Admin UI (/admin/blog)**
-   - Blog list with "Create New" button
-   - Form for editing title, slug, description, hero image URL, tags, content
-   - Preview mode for MDX
-   - Authentication/authorization (only admins)
+3. **管理画面UI (/admin/blog)**
+   - 記事一覧と「新規作成」ボタン
+   - タイトル、スラッグ、説明、ヒーロー画像URL、タグ、内容の編集フォーム
+   - MDXプレビュー機能
+   - 認証・認可（管理者のみアクセス可能）
 
-4. **Frontend Integration**
-   - Blog page fetches from API instead of reading local `.mdx` files
-   - Handle `published` flag to only show public posts
+4. **フロントエンド統合**
+   - ブログページはローカル`.mdx`ファイルではなくAPIから取得
+   - `published`フラグを考慮し、公開記事のみ表示
 
-5. **Deployment Considerations**
-   - Ensure environment variables (DB URL, admin auth secrets) are set in Azure
-   - Use Azure Managed PostgreSQL or similar for DB
-   - Migrate existing `.mdx` posts into the database
+5. **デプロイ関連事項**
+   - 環境変数（DB URLや管理者認証シークレット等）をAzureに設定
+   - DBはAzure Managed PostgreSQL等を利用
+   - 既存の`.mdx`記事をデータベースへ移行
 
-6. **Security & Access Control**
-   - Blob storage must be private (no anonymous access)
-   - Use SAS tokens or API streaming to serve images
-   - Admin endpoints must require authentication
-   - Apply rate limiting and size limits to uploads and API routes
+6. **セキュリティとアクセス制御**
+   - Blobストレージはプライベート設定（匿名アクセス禁止）
+   - 画像配信はSASトークンまたはAPIストリーミングを利用
+   - 管理用エンドポイントは認証必須
+   - アップロードやAPIルートにレート制限・サイズ制限を適用
 
-## Notes
-- Initial version can be text + images only; advanced MDX components can be added later.
-- Keep styling consistent with current `prose` typography setup.
-- Stripe Checkout will be used for initial payment integration; PayPal may be added later, Amazon Pay considered in future.
+7. **受注管理と問い合わせ**
+   - Orderモデルに`status`フィールドを追加（完了）
+   - 管理画面でステータス更新可能にする（完了）
+   - 問い合わせフォームを設置し、ContactMessageモデルに保存
+   - 管理画面から問い合わせ一覧・詳細を確認できるようにする
 
-## Mobile UX & Perf
+## メモ
+- 初期バージョンはテキスト＋画像のみ。高度なMDXコンポーネントは後で追加可能。
+- スタイリングは現行の`prose`タイポグラフィ設定と一貫性を保つ。y
+- 決済はまずStripe Checkoutを導入、PayPalは後で追加可能。Amazon Payは将来的に検討。
 
-- [x] Landing: Featured Works（モバイル）
-  - [x] A案: スマホでは非表示（`hidden md:block`） (implemented and deployed)
+## モバイルUX & パフォーマンス
+
+- [x] ランディング: Featured Works（モバイル）
+  - [x] A案: スマホでは非表示（`hidden md:block`）（実装済み・デプロイ済み）
   - [ ] B案: 2列グリッド（最大4枚）＋「もっと見る」→ /gallery
   - [ ] サムネ `sizes="(max-width: 640px) 50vw, 33vw"`
 
-- [ ] Lightbox: ウォーターマーク事前生成
+- [ ] Lightbox: ウォーターマーク画像の事前生成
   - [ ] Upload時に `photos/wm/<slug>_wm_2048.jpg` を生成（sharpで合成）
   - [ ] `/api/wm/[slug]` は存在チェック→あれば302、無ければ生成→保存→302
-  - [ ] Blob に `Cache-Control: public, max-age=31536000, immutable`
+  - [ ] Blobに `Cache-Control: public, max-age=31536000, immutable` を設定
   - [ ] ファイル名に `wm` のバージョンを含める（例 `_wm-v2_`）
-  - Note: 現状は表示時に生成、Upload時生成は未実装
+  - メモ: 現状は表示時に生成、Upload時生成は未実装
 
-- [ ] Landing: Hero 画像最適化
+- [ ] ランディング: ヒーロー画像最適化
   - [ ] 出力幅: 640/960/1280/1600/1920 を生成（AVIF/WebP優先）
   - [ ] `<Image priority sizes="(max-width:640px) 100vw, (max-width:1024px) 90vw, 1200px">`
-  - [ ] blurDataURL プレースホルダを設定
+  - [ ] blurDataURLプレースホルダを設定
   - [ ] 目標: LCP画像 < 200KB
-  - Note: 1920px WebP/JPEG optimized image deployed; responsive multi-size and blurDataURL pending
+  - メモ: 1920px WebP/JPEG最適化画像はデプロイ済み。レスポンシブの複数サイズ・blurDataURLは未対応
 
-- [ ] Gallery 体験
+- [ ] ギャラリー体験
   - [ ] 初期ロードを12枚に制限、以降“もっと見る”で追加ロード
   - [ ] `rowConstraints.minPhotos: 1`（少枚数でも崩れない）
-  - [ ] サムネは 480px（DPR2向けに960pxまで許容）
+  - [ ] サムネは480px（DPR2向けに960pxまで許容）
 
 - [ ] 本番キャッシュ/TTL
   - [ ] public画像: CDN長期キャッシュ
@@ -89,12 +97,12 @@ Implement a lightweight CMS for blog posts so that articles can be added/edited 
 
 - [ ] Lightbox 2048対応
   - [ ] 2048pxはPC向けのみ提供、モバイルは480pxを利用
-  - [ ] 将来的に1024px variantを追加してsrcset対応
+  - [ ] 将来的に1024pxバリアントを追加しsrcset対応
   - [ ] /api/photos: largeはSAS発行に切替、thumbは公開URLのまま
-  - Note: 初期対応はモバイルでの速度優先、セキュリティ確保のため2048は非公開運用
+  - メモ: 初期対応はモバイルでの速度優先、セキュリティ確保のため2048は非公開運用
 
-## Deployment / Ops Notes
+## デプロイ・運用メモ
 
-- [ ] Ensure background color is fixed light (`globals.css` with `color-scheme: light`, `min-height: 100svh`)
-- [ ] Verify mobile layout after deployment (Pixel9a実機確認済み)
-- [ ] Monitor ACA metrics; consider Front Door for CDN/Access logs
+- [ ] 背景色を固定のライトに（`globals.css`で`color-scheme: light`、`min-height: 100svh`を設定）
+- [ ] デプロイ後のモバイルレイアウト確認（Pixel9a実機確認済み）
+- [ ] ACAメトリクスを監視。Front Door導入でCDN/アクセスログも検討

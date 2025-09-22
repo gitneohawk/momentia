@@ -21,10 +21,11 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>("");
 
   const [variant, setVariant] = useState<"digital" | "print_a2">("digital");
-  const priceDigital = item?.priceDigitalJPY ?? 10000; // fallback to 10,000 JPY
-  const pricePrintA2 = item?.pricePrintA2JPY ?? 50000; // fallback to 50,000 JPY
+  const priceDigital = item?.priceDigitalJPY ?? 11000; // fallback to 10,000 JPY
+  const pricePrintA2 = item?.pricePrintA2JPY ?? 55000; // fallback to 50,000 JPY
 
   useEffect(() => {
     let mounted = true;
@@ -65,6 +66,13 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
       aborted = true;
     };
   }, [slug]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("checkoutEmail");
+      if (saved) setEmail(saved);
+    } catch {}
+  }, []);
 
   const mp = useMemo(() => {
     if (!item) return 0;
@@ -142,6 +150,21 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
 
           {/* バリアント選択 */}
           <div className="grid gap-3 pt-2 border-t">
+            {/* 購入者メール（許可されたメールのみ購入可：環境変数 ALLOWED_CHECKOUT_EMAILS） */}
+            <div className="grid gap-1">
+              <label className="text-sm text-neutral-700" htmlFor="checkout-email">メールアドレス</label>
+              <input
+                id="checkout-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-neutral-500">※ テスト中は許可されたメールアドレスのみ購入可能です。</p>
+            </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -180,26 +203,51 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
           </div>
 
           {/* CTA */}
-          <div className="flex gap-3">
-            <form action={`/purchase/${item.slug}/checkout`} method="post" className="contents">
-              <input type="hidden" name="variant" value={variant} />
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-xl bg-black text-white px-5 py-2.5 text-sm font-semibold shadow hover:shadow-md active:scale-[0.99] transition"
-              >
-                購入手続きへ（仮）
-              </button>
-            </form>
-            <a
-              href="/gallery"
-              className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm"
-            >
-              ギャラリーに戻る
-            </a>
-          </div>
+<div className="flex gap-3">
+  <button
+    type="button"
+    onClick={async () => {
+      if (!email || !email.includes("@")) {
+        alert("メールアドレスを入力してください。");
+        return;
+      }
+      try { localStorage.setItem("checkoutEmail", email); } catch {}
+      try {
+        const res = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemType: variant === "digital" ? "digital" : "panel",
+            name: variant === "digital" ? `${item.slug}（デジタル）` : `${item.slug}（A2パネル）`,
+            amountJpy: variant === "digital" ? priceDigital : pricePrintA2,
+            slug: item.slug,
+            customerEmail: email,
+          }),
+        });
+        if (!res.ok) throw new Error(`Checkout API error: ${res.status}`);
+        const { url } = await res.json();
+        if (url) window.location.href = url;
+      } catch (e) {
+        console.error("Checkout error", e);
+        alert("購入手続きに失敗しました。");
+      }
+    }}
+    className="inline-flex items-center justify-center rounded-xl bg-black text-white px-5 py-2.5 text-sm font-semibold shadow hover:shadow-md active:scale-[0.99] transition"
+  >
+    購入手続きへ
+  </button>
+
+  <a
+    href="/gallery"
+    className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm"
+  >
+    ギャラリーに戻る
+  </a>
+</div>
 
           <div className="text-xs text-neutral-500 leading-relaxed">
-            個人利用の範囲でご利用いただけます。再配布・再販売・商用利用は別途ライセンスが必要です。
+            購入者（個人・法人）は自らの活動や業務において、本画像を商用利用を含めてご利用いただけます。
+            再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は禁止されます。
             高解像度ファイルには透かしは入りません。詳細は利用規約をご確認ください。
           </div>
         </div>
