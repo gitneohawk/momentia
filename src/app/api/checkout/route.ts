@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { getToken } from 'next-auth/jwt';
 
 export async function POST(req: NextRequest) {
   try {
     const { itemType, name, amountJpy, slug, customerEmail } = await req.json();
 
+    // ログイン済みユーザのメールを優先（未ログイン時はリクエストの customerEmail を利用）
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const tokenEmail = (token?.email as string | undefined) || undefined;
+    const email = (tokenEmail || customerEmail || '').trim();
+
+    if (!email) {
+      return NextResponse.json({ error: 'メールアドレスを入力してください。' }, { status: 400 });
+    }
+
     // 許可メール制限（環境変数にカンマ区切りで設定）
     const allowedRaw = process.env.ALLOWED_CHECKOUT_EMAILS || '';
     const allowed = allowedRaw.split(',').map((s) => s.trim()).filter(Boolean);
-    if (allowed.length > 0) {
-      if (!customerEmail || !allowed.includes(customerEmail)) {
-        console.warn('[checkout] blocked by ALLOWED_CHECKOUT_EMAILS', { customerEmail });
-        return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-      }
+    if (allowed.length > 0 && !allowed.includes(email)) {
+      console.warn('[checkout] blocked by ALLOWED_CHECKOUT_EMAILS', { email });
+      return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     }
 
     // ← ここで初期化（ビルド時には実行されない）
@@ -25,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      customer_email: customerEmail,
+      customer_email: email,
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase/success${slug ? `?slug=${encodeURIComponent(slug)}` : ''}${slug ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase/cancel`,
       line_items: [
