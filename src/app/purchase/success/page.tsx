@@ -36,7 +36,7 @@ export default async function PurchaseSuccessPage({
 
   let item: PhotoItem | null = null;
   if (slug) {
-    const hdrs = headers();
+    const hdrs = await headers();
     const base = process.env.NEXT_PUBLIC_BASE_URL ?? `http://${hdrs.get("host")}`;
     try {
       const res = await fetch(
