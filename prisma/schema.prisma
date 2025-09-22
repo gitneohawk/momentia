@@ -21,8 +21,8 @@ model Photo {
   variants    Variant[]
   keywords    Keyword[]
   published   Boolean  @default(false)
-  priceDigitalJPY Int @default(10000)
-  pricePrintA2JPY Int @default(50000)
+  priceDigitalJPY Int @default(11000)
+  pricePrintA2JPY Int @default(55000)
 }
 
 model Variant {
@@ -103,4 +103,43 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// === Orders ===
+model Order {
+  id              String   @id @default(cuid())
+  sessionId       String   @unique            // Stripe Checkout Session ID
+  paymentIntentId String?                      // Stripe PaymentIntent ID (optional)
+
+  // 商品情報 / 識別
+  itemType        String                        // "digital" | "panel" など（将来 enum でもOK）
+  name            String?                       // 表示名
+  slug            String?                       // Photo を特定するための slug
+
+  // 購入者情報
+  email           String?                       // 顧客メール
+
+  // 金額情報
+  amountJpy       Int                           // 支払い金額（JPY, 税込）
+  currency        String   @default("jpy")     // 将来の多通貨拡張用
+
+  // 追加情報
+  shipping        Json?                         // 物理商品の配送先等（PaymentIntent.shipping）
+  metadata        Json?                         // Checkout Session の metadata
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt 
+
+  status OrderStatus @default(paid)
+
+  @@index([slug])
+  @@index([email])
+}
+
+// schema.prisma の末尾あたりに追加
+enum OrderStatus {
+  paid
+  processing
+  shipped
+  canceled
 }
