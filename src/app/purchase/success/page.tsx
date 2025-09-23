@@ -12,6 +12,8 @@ type OrderSummary = {
   itemType: "digital" | "panel" | string | null;
   status: string | null;
   createdAt: Date;
+  amountJpy: number | null;
+  currency: string | null;
 };
 
 // searchParams から文字列を安全に取得
@@ -30,7 +32,8 @@ export default async function PurchaseSuccessPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const sessionId = getParam(searchParams, "session_id");
+  const sp = searchParams;
+  const sessionId = getParam(sp, "session_id");
 
   // データ取得
   let order: OrderSummary | null = null;
@@ -44,6 +47,8 @@ export default async function PurchaseSuccessPage({
         itemType: true,
         status: true,
         createdAt: true,
+        amountJpy: true,
+        currency: true,
       },
     })) as OrderSummary | null;
   }
@@ -51,6 +56,9 @@ export default async function PurchaseSuccessPage({
   // 日時整形（JST）
   const formatDate = (d: Date | undefined) =>
     d ? new Date(d).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "-";
+
+  const formatJPY = (v: number | null | undefined) =>
+    v == null ? "-" : new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(v);
 
   return (
     <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 grid gap-6">
@@ -74,6 +82,9 @@ export default async function PurchaseSuccessPage({
 
             <div className="text-neutral-500">種類</div>
             <div>{order.itemType ?? "-"}</div>
+
+            <div className="text-neutral-500">金額</div>
+            <div>{formatJPY(order.amountJpy)}（税込）</div>
 
             <div className="text-neutral-500">Slug</div>
             <div>{order.slug ?? "-"}</div>
