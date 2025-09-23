@@ -28,9 +28,9 @@ function getParam(
 export default async function PurchaseSuccessPage({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const sp = searchParams ?? {};
+  const sp = await searchParams;
   const sessionId = getParam(sp, "session_id");
 
   // データ取得
