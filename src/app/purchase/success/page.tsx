@@ -1,8 +1,6 @@
 // src/app/purchase/success/page.tsx
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic"; // 完全に動的レンダリング
-export const revalidate = 0; // 再検証しない（キャッシュ無効）
 
 // 表示用の型
 type OrderSummary = {
@@ -32,7 +30,7 @@ export default async function PurchaseSuccessPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const sp = searchParams;
+  const sp = searchParams ?? {};
   const sessionId = getParam(sp, "session_id");
 
   // データ取得
