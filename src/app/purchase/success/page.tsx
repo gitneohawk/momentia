@@ -1,87 +1,94 @@
 // src/app/purchase/success/page.tsx
-import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic"; // 完全に動的レンダリング
 export const revalidate = 0; // 再検証しない（キャッシュ無効）
 
-type PhotoItem = {
-  slug: string;
-  caption?: string | null;
-  urls: {
-    thumb: string | null;
-    large: string | null;
-    original: string;
-    watermarked: string;
-  };
+// 表示用の型
+type OrderSummary = {
+  sessionId: string;
+  email: string | null;
+  slug: string | null;
+  itemType: "digital" | "panel" | string | null;
+  status: string | null;
+  createdAt: Date;
 };
+
+// searchParams から文字列を安全に取得
+function getParam(
+  sp: Record<string, string | string[] | undefined> | undefined,
+  key: string
+): string | undefined {
+  const v = sp?.[key];
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v[0];
+  return undefined;
+}
 
 export default async function PurchaseSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const sp = await searchParams;
-  let slug = (sp?.slug as string | undefined) ?? undefined;
-  const sessionId = (sp?.session_id as string | undefined) ?? undefined;
+  const sessionId = getParam(searchParams, "session_id");
 
-  // URL に slug が無い場合は、webhook で保存済みの Order から解決
-  if (!slug && sessionId) {
-    const order = await prisma.order.findUnique({
+  // データ取得
+  let order: OrderSummary | null = null;
+  if (sessionId) {
+    order = (await prisma.order.findUnique({
       where: { sessionId },
-      select: { slug: true },
-    });
-    slug = order?.slug ?? undefined;
+      select: {
+        sessionId: true,
+        email: true,
+        slug: true,
+        itemType: true,
+        status: true,
+        createdAt: true,
+      },
+    })) as OrderSummary | null;
   }
 
-  let item: PhotoItem | null = null;
-  if (slug) {
-    const hdrs = await headers();
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? `http://${hdrs.get("host")}`;
-    try {
-      const res = await fetch(
-        `${base}/api/photos?kw=${encodeURIComponent(slug)}&limit=1`,
-        { cache: "no-store" }
-      );
-      if (res.ok) {
-        const json = (await res.json()) as { items?: PhotoItem[] };
-        item = json?.items && json.items.length > 0 ? json.items[0] : null;
-      }
-    } catch {
-      // noop
-    }
-  }
+  // 日時整形（JST）
+  const formatDate = (d: Date | undefined) =>
+    d ? new Date(d).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "-";
 
   return (
     <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 grid gap-6">
       <h1 className="text-2xl font-semibold">ご購入ありがとうございます</h1>
+
       {sessionId ? (
         <p className="text-sm text-neutral-600">
           注文ID: <span className="font-mono">{sessionId}</span>
         </p>
       ) : null}
 
-      {slug && item && (
-        <div className="grid gap-4">
-          <div className="rounded-xl overflow-hidden bg-neutral-100 ring-1 ring-black/10">
-            <img
-              src={item.urls.watermarked ?? item.urls.large ?? item.urls.original}
-              alt={item.slug}
-              className="w-full h-auto"
-            />
+      {/* サマリー表示 */}
+      {order ? (
+        <div className="grid gap-2 text-[15px]">
+          <div className="grid grid-cols-[9rem_1fr] gap-y-1 sm:grid-cols-[10rem_1fr]">
+            <div className="text-neutral-500">日時</div>
+            <div>{formatDate(order.createdAt)}</div>
+
+            <div className="text-neutral-500">Email</div>
+            <div>{order.email ?? "-"}</div>
+
+            <div className="text-neutral-500">種類</div>
+            <div>{order.itemType ?? "-"}</div>
+
+            <div className="text-neutral-500">Slug</div>
+            <div>{order.slug ?? "-"}</div>
+
+            <div className="text-neutral-500">ステータス</div>
+            <div>{order.status ?? "-"}</div>
           </div>
-          <p className="text-neutral-700">{item.caption || item.slug}</p>
+        </div>
+      ) : (
+        <div className="text-sm text-neutral-700">
+          注文情報の取得に失敗しました。時間をおいて再度お試しください。
         </div>
       )}
 
-      {slug && !item && (
-        <div>
-          <h2 className="text-lg font-medium mb-1">Not found</h2>
-          <p className="text-sm text-neutral-600">この写真は見つからないか、非公開です。</p>
-        </div>
-      )}
-
-      <div className="grid gap-2 text-sm text-neutral-700">
+      <div className="grid gap-2 text-sm text-neutral-700 pt-4">
         <p>・デジタル商品: 決済確認後、ダウンロードリンクをメールでお送りします（準備中）。</p>
         <p>・パネル商品: ご入力いただいた住所に発送します。準備が整い次第、メールでご連絡します。</p>
       </div>
