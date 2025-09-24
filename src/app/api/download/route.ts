@@ -96,6 +96,8 @@ export async function GET(req: NextRequest) {
       permissions: BlobSASPermissions.parse("r"),
       startsOn: new Date(),
       expiresOn: new Date(Date.now() + 15 * 60 * 1000), // 15分
+      contentDisposition: `attachment; filename="${order.slug}${suffix}.jpg"`,
+      contentType: "image/jpeg",
     } as const;
 
     const sasToken = generateBlobSASQueryParameters(
