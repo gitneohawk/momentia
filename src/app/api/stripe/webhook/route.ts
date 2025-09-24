@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { PrismaClient } from "@prisma/client";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
 export const runtime = "nodejs"; // Edge不可: 署名検証に生ボディが必要
@@ -44,6 +45,11 @@ export async function POST(req: Request) {
 
     try {
       const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
+      const itemType = (meta as any)?.itemType ?? "unknown";
+      let downloadToken: string | null = null;
+      if (itemType === "digital") {
+        downloadToken = crypto.randomBytes(32).toString("hex");
+      }
       await prisma.order.upsert({
         where: { sessionId: full.id },
         update: {},
@@ -53,7 +59,7 @@ export async function POST(req: Request) {
             typeof full.payment_intent === "string"
               ? full.payment_intent
               : full.payment_intent?.id ?? null,
-          itemType: (meta as any)?.itemType ?? "unknown",
+          itemType,
           name: (meta as any)?.name ?? null,
           slug: (meta as any)?.slug ?? null,
           email,
@@ -61,6 +67,7 @@ export async function POST(req: Request) {
           currency: full.currency ?? "jpy",
           shipping: shipping as any,
           metadata: meta as any,
+          downloadToken,
         },
       });
       console.log("[webhook] order saved:", {

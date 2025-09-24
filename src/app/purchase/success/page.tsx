@@ -12,6 +12,7 @@ type OrderSummary = {
   createdAt: Date;
   amountJpy: number | null;
   currency: string | null;
+  downloadToken?: string | null;
 };
 
 // searchParams から文字列を安全に取得
@@ -47,6 +48,7 @@ export default async function PurchaseSuccessPage({
         createdAt: true,
         amountJpy: true,
         currency: true,
+        downloadToken: true,
       },
     })) as OrderSummary | null;
   }
@@ -97,9 +99,30 @@ export default async function PurchaseSuccessPage({
         </div>
       )}
 
+      {/* デジタル商品のダウンロードリンク */}
+      {order?.itemType === "digital" && order?.downloadToken ? (
+        <div className="mt-6 rounded-xl border bg-neutral-50 p-4">
+          <h2 className="text-lg font-medium mb-2">デジタルデータのダウンロード</h2>
+          <p className="text-sm text-neutral-700 mb-3">
+            下のリンクからダウンロードできます。リンクは一定時間で無効になります。
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href={`/api/download?token=${encodeURIComponent(order.downloadToken)}`}
+              className="inline-flex items-center rounded-xl bg-black text-white px-4 py-2 text-sm hover:opacity-90"
+            >
+              ダウンロードリンクを開く
+            </a>
+            <code className="text-xs bg-white border rounded px-2 py-1 break-all">
+              /api/download?token={order.downloadToken}
+            </code>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-2 text-sm text-neutral-700 pt-4">
-        <p>・デジタル商品: 決済確認後、ダウンロードリンクをメールでお送りします（準備中）。</p>
-        <p>・パネル商品: ご入力いただいた住所に発送します。準備が整い次第、メールでご連絡します。</p>
+        <p>・デジタル商品: 決済完了後にこの画面にダウンロードリンクが表示されます（メールでもお送りします）。</p>
+        <p>・パネル商品: ご入力いただいた住所に発送します。準備が整い次第、メールでご連絡します（送料込み、税込）。</p>
       </div>
 
       <div className="pt-2">

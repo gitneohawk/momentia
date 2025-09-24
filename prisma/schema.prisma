@@ -125,6 +125,7 @@ model Order {
 
   // 追加情報
   shipping        Json?                         // 物理商品の配送先等（PaymentIntent.shipping）
+  downloadToken   String?                         
   metadata        Json?                         // Checkout Session の metadata
 
   createdAt       DateTime @default(now())
