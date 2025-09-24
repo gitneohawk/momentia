@@ -117,7 +117,7 @@ jobs:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
           set -euo pipefail
-          npx prisma migrate status --schema prisma/schema.prisma --no-color
+          npx prisma migrate status --schema prisma/schema.prisma
 
       - name: Show active revisions
         run: |
