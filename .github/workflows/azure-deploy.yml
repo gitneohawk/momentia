@@ -112,22 +112,12 @@ jobs:
             echo "Single revision mode; skipping traffic split (latest already receives 100%)."
           fi
 
-      - name: Prisma migrate deploy (post-deploy safety)
+      - name: Verify DB schema is up to date
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
           set -euo pipefail
-          # Wait until latest revision is ready to accept exec
-          for i in $(seq 1 24); do
-            READY=$(az containerapp revision list -n "$APP" -g "$RG" --query "[?properties.active==\`true\`].[properties.healthState][0][0]" -o tsv 2>/dev/null || echo "")
-            if [ "${READY}" = "Healthy" ] || [ "${READY}" = "Ready" ]; then
-              echo "Active revision is ${READY}"
-              break
-            fi
-            echo "Waiting for active revision to become ready... (${i})"
-            sleep 5
-          done
-          # Run migrate deploy *inside* the running container (uses container env DATABASE_URL)
-          az containerapp exec -n "$APP" -g "$RG" \
-            --command "sh -lc 'cd /app && npx prisma migrate deploy --schema prisma/schema.prisma && npx prisma generate --schema prisma/schema.prisma'"
+          npx prisma migrate status --schema prisma/schema.prisma --no-color
 
       - name: Show active revisions
         run: |
