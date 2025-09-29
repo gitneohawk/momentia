@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "next dev --turbopack",
@@ -23,6 +23,7 @@
     "stripe:trigger": "stripe trigger checkout.session.completed"
   },
   "dependencies": {
+    "@azure/communication-email": "^1.0.0",
     "@azure/identity": "^4.10.1",
     "@azure/storage-blob": "^12.27.0",
     "@prisma/client": "^6.16.2",

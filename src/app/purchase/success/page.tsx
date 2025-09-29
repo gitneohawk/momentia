@@ -111,11 +111,8 @@ export default async function PurchaseSuccessPage({
               href={`/api/download?token=${encodeURIComponent(order.downloadToken)}`}
               className="inline-flex items-center rounded-xl bg-black text-white px-4 py-2 text-sm hover:opacity-90"
             >
-              ダウンロードリンクを開く
+              ダウンロードする
             </a>
-            <code className="text-xs bg-white border rounded px-2 py-1 break-all">
-              /api/download?token={order.downloadToken}
-            </code>
           </div>
         </div>
       ) : null}

@@ -23,7 +23,7 @@ RUN npx prisma generate --schema prisma/schema.prisma
 #    npm run build
 RUN npm run build
 # ---------- runner ----------
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache \
   libc6-compat \
