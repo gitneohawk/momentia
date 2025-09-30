@@ -4,13 +4,16 @@ import { getServerSession } from "next-auth";
 
 export default async function AdminMenu() {
   const session = await getServerSession();
-  if (!session) return null; // ← ログインしてなければ何も出さない
+  if (!session) return null;
+
+  // 管理者チェック: evoluzio.com ドメインのユーザーだけ
+  const email = session.user?.email ?? "";
+  const isAdmin = email.endsWith("@evoluzio.com");
+  if (!isAdmin) return null;
 
   return (
     <nav className="flex items-center gap-3">
-      <Link href="/admin/manage" className="text-sm hover:underline">Admin</Link>
-      <Link href="/admin/upload" className="text-sm hover:underline">Upload</Link>
-      <Link href="/admin/blog" className="text-sm hover:underline">Blog Admin</Link>
+      <Link href="/admin" className="text-sm hover:underline">Admin</Link>
     </nav>
   );
 }

@@ -135,3 +135,20 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] アラート 5xx, レイテンシ, CPU/メモリ, Postgres 接続エラーを作成
 - [ ] Stripe Webhook 失敗を Dashboard のアラートメールに追加
 - [ ] 監視設定の IaC 化（Bicep/Terraform もしくは `az monitor` スクリプト）
+
+## 問い合わせフォーム / メール通知関連
+
+- [ ] 問い合わせフォーム実装
+  - /contact ページで Name / Email / Message 入力
+  - DBに Inquiry テーブル追加（id, name, email, message, createdAt, status=new）
+  - 保存後 info@evoluzio.com へ通知メール送信
+  - 管理画面 /admin/inquiries で一覧・ステータス管理可能にする
+
+- [ ] 決済完了通知メール
+  - Stripe Webhook → DB保存後、購入者にメール送信
+  - From: info@evoluzio.com（運営会社アドレスで安心感を与える）
+  - 将来的にブランド強化目的で no-reply@momentia.photo を追加利用検討
+
+## ドメイン方針
+- momentia.photo → ブランド用公式ドメイン（Webサービス用）
+- evoluzio.com → 運営会社ドメイン（決済・問い合わせメール送信用）

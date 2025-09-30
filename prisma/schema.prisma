@@ -137,10 +137,28 @@ model Order {
   @@index([email])
 }
 
-// schema.prisma の末尾あたりに追加
 enum OrderStatus {
   paid
   processing
   shipped
   canceled
+}
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String   @db.Text
+  status    InquiryStatus @default(NEW)
+  ip        String?       // 簡易レート制限・追跡用
+  userAgent String?       // 調査用
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum InquiryStatus {
+  NEW
+  OPEN
+  CLOSED
 }

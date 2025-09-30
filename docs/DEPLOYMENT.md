@@ -64,6 +64,16 @@ Momentia プロジェクトの Azure Container Apps を用いたデプロイ手�
      ```
    - 必要に応じてローカルや CI/CD パイプラインで実行
 
+### 🔧 開発・デバッグ用のコマンドメモ
+
+Prisma Client が必要な場合やスキーマ変更を反映したい場合は、Docker コンテナ内で以下のコマンドを実行することがあります:
+
+```
+docker exec -it momentia-app-1 sh -lc 'npx prisma generate --schema prisma/schema.prisma'
+```
+
+この手順を忘れがちなのでメモしておきます。なお、通常の `npx prisma migrate deploy` は CI/CD や本番環境用のコマンドです。
+
 6. **Stripe Webhook の設定**
 
    - Stripe ダッシュボードで Webhook エンドポイントを追加
@@ -86,6 +96,11 @@ Momentia プロジェクトの Azure Container Apps を用いたデプロイ手�
 - ログやモニタリング（App Insights など）でエラーがないかチェック
 
 ---
+
+### 環境変数管理
+- `DATABASE_URL` は `prisma/.env` に定義
+- `prisma migrate dev` / `prisma generate` 実行時にこの値が参照される
+- 本番環境では GitHub Actions の Secrets / Azure App Settings から設定される
 
 ## 補足: npm スクリプト例
 

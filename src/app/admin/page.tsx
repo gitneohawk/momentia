@@ -28,13 +28,23 @@ export default function AdminDashboard() {
           </Link>
         </li>
         <li>
-          <Link href="/admin/photos" className="text-blue-600 underline">
+          <Link href="/admin/upload" className="text-blue-600 underline">
+            Photos アップロード
+          </Link>
+        </li>
+        <li>
+          <Link href="/admin/manage" className="text-blue-600 underline">
             Photos 管理
           </Link>
         </li>
         <li>
           <Link href="/admin/blog" className="text-blue-600 underline">
             Blog 管理
+          </Link>
+        </li>
+        <li>
+          <Link href="/admin/inquiries" className="text-blue-600 underline">
+            Inquiries 管理
           </Link>
         </li>
       </ul>

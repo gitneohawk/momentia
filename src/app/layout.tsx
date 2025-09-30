@@ -38,9 +38,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-neutral-50 text-neutral-900`}>
         <Providers>
         <header className="border-b border-neutral-200/80 bg-white">
-          <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
+          <div className="mx-auto max-w-6xl px-2 py-4 flex items-center justify-between">
             <div className="flex items-center gap-8">
-              <Link href="/" className="text-xl font-semibold tracking-tight">Momentia</Link>
+              <Link href="/" className="flex items-center">
+                <img src="/momentia_logo.svg" alt="Momentia" className="h-10 w-auto align-middle" />
+              </Link>
               <nav className="flex items-center gap-5 text-sm text-neutral-600 ml-0">
                 <Link href="/gallery" className="hover:text-neutral-900 transition">Gallery</Link>
                 <Link href="/blog" className="hover:text-neutral-900 transition">Blog</Link>
@@ -61,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/legal/license" className="hover:text-neutral-900 transition">ライセンス</Link>
               <Link href="/legal/terms" className="hover:text-neutral-900 transition">利用規約</Link>
               <Link href="/legal/privacy" className="hover:text-neutral-900 transition">プライバシー</Link>
+              <Link href="/contact" className="hover:text-neutral-900 transition">お問い合わせ</Link>
             </div>
             <a href="https://evoluzio.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:opacity-90 transition">
               <span>Powered by</span>
