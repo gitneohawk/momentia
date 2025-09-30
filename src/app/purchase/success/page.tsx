@@ -84,7 +84,10 @@ export default async function PurchaseSuccessPage({
             <div>{order.itemType ?? "-"}</div>
 
             <div className="text-neutral-500">金額</div>
-            <div>{formatJPY(order.amountJpy)}（税込）</div>
+            <div>
+              {formatJPY(order.amountJpy)}
+              {order.itemType === "panel" ? "（送料込み、税込）" : "（税込）"}
+            </div>
 
             <div className="text-neutral-500">Slug</div>
             <div>{order.slug ?? "-"}</div>

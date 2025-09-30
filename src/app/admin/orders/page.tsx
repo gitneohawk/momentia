@@ -37,7 +37,12 @@ export default async function OrdersPage() {
     <td className="px-3 py-2">{o.email ?? "-"}</td>
     <td className="px-3 py-2">{o.itemType}</td>
     <td className="px-3 py-2">{o.slug ?? "-"}</td>
-    <td className="px-3 py-2 text-right">{o.amountJpy?.toLocaleString?.() ?? o.amountJpy}</td>
+    <td className="px-3 py-2 text-right">
+      {o.amountJpy?.toLocaleString?.() ?? o.amountJpy}
+      <span className="ml-1 text-xs text-neutral-500">
+        {o.itemType === "panel" ? "（送料込み、税込）" : "（税込）"}
+      </span>
+    </td>
     <td className="px-3 py-2">{o.status}</td>
     <td className="px-3 py-2 font-mono">{o.sessionId.slice(0, 12)}…</td>
   </tr>

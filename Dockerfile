@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm ci --ignore-scripts
 
 # ---------- builder ----------
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 # Prisma schema を必ず含める（.dockerignore に入っているとビルドに乗らないので注意）

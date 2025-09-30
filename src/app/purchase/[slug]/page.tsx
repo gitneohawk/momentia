@@ -175,7 +175,9 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
               >
                 <div className="font-medium">デジタル（商用可）</div>
                 <div className="text-sm text-neutral-600">JPEG / 個人・商用利用可（規約順守）</div>
-                <div className="mt-1 text-lg font-semibold">¥{priceDigital.toLocaleString()}</div>
+                <div className="mt-1 text-lg font-semibold">
+                  ¥{priceDigital.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（税込）</span>
+                </div>
               </button>
 
               <button
@@ -187,7 +189,9 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
               >
                 <div className="font-medium">A2 プロプリント（パネル）</div>
                 <div className="text-sm text-neutral-600">送料込 / 額装なし / 工房プリント</div>
-                <div className="mt-1 text-lg font-semibold">¥{pricePrintA2.toLocaleString()}</div>
+                <div className="mt-1 text-lg font-semibold">
+                  ¥{pricePrintA2.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（送料込み、税込）</span>
+                </div>
               </button>
             </div>
 
@@ -197,7 +201,9 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
               </div>
               <div className="text-2xl font-semibold">
                 ¥{(variant === "digital" ? priceDigital : pricePrintA2).toLocaleString()}
-                <span className="text-sm text-neutral-500 ml-2">税込</span>
+                <span className="text-sm text-neutral-500 ml-2">
+                  {variant === "print_a2" ? "（送料込み、税込）" : "（税込）"}
+                </span>
               </div>
             </div>
           </div>

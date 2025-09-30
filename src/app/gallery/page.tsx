@@ -145,12 +145,6 @@ export default function GalleryPage() {
               <div key="purchase-info" className="yarl__button flex items-center gap-4">
                 {active && (
                   <>
-                    <div className="text-left text-[12px] text-white hidden sm:block">
-                      {active.caption && <div className="font-medium line-clamp-1">{active.caption}</div>}
-                      <div className="text-white/85">
-                        {active.width}×{active.height} px
-                      </div>
-                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -165,7 +159,7 @@ export default function GalleryPage() {
                     >
                       <>
                         <span className="hidden md:inline">
-                          Purchase ¥{priceDigital.toLocaleString()} / A2 ¥{pricePrintA2.toLocaleString()}
+                          Purchase ¥{priceDigital.toLocaleString()}（税込） / A2 ¥{pricePrintA2.toLocaleString()}（送料込み、税込）
                         </span>
                         <span className="md:hidden">Purchase</span>
                       </>
