@@ -47,6 +47,19 @@ export async function PATCH(
       }
     }
 
+    // A2 print price update
+    const priceA2Raw = body.pricePrintA2JPY;
+    if (priceA2Raw !== undefined) {
+      if (priceA2Raw === null) {
+        data.pricePrintA2JPY = null;
+      } else {
+        const n2 = Number(priceA2Raw);
+        if (Number.isFinite(n2) && n2 >= 0) {
+          data.pricePrintA2JPY = Math.trunc(n2);
+        }
+      }
+    }
+
     // Normalize keywords if provided
     let incomingKeywords: string[] | null = null;
     if (Array.isArray(body.keywords)) {

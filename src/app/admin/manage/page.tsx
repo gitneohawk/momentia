@@ -11,6 +11,7 @@ type Item = {
   keywords: string[];
   published: boolean;
   priceDigitalJPY: number | null; // ← 追加
+  pricePrintA2JPY?: number | null;
   urls: { thumb: string | null; large: string | null; original: string };
 };
 
@@ -156,6 +157,20 @@ export default function AdminManagePage() {
     }
   };
 
+  const savePriceA2 = async (slug: string, price: number) => {
+    setBusy(slug);
+    const res = await fetch(`/api/admin/photo/${slug}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pricePrintA2JPY: price }),
+    });
+    setBusy(null);
+    setMsg(res.ok ? "Price (A2) saved" : "Price (A2) save failed");
+    if (res.ok) {
+      setItems((prev) => prev.map((p) => (p.slug === slug ? { ...p, pricePrintA2JPY: price } : p)));
+    }
+  };
+
   const saveTags = async (slug: string, tags: string[]) => {
     setBusy(slug);
     const res = await fetch(`/api/admin/photo/${slug}`, {
@@ -270,6 +285,21 @@ export default function AdminManagePage() {
                   onBlur={(e) => {
                     const v = Math.max(0, Math.floor(Number(e.currentTarget.value) || 0));
                     if (v !== (it.priceDigitalJPY ?? 0)) savePrice(it.slug, v);
+                  }}
+                />
+              </div>
+
+              {/* 価格（A2, JPY） */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-neutral-600">Price (Print A2, JPY)</label>
+                <input
+                  type="number"
+                  min={0}
+                  defaultValue={it.pricePrintA2JPY ?? 50000}
+                  className="w-32 border rounded px-2 py-1 text-sm"
+                  onBlur={(e) => {
+                    const v = Math.max(0, Math.floor(Number(e.currentTarget.value) || 0));
+                    if (v !== (it.pricePrintA2JPY ?? 0)) savePriceA2(it.slug, v);
                   }}
                 />
               </div>
