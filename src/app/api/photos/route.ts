@@ -173,6 +173,7 @@ export async function GET(req: Request) {
       slug: p.slug, width: p.width, height: p.height, caption: p.caption,
       capturedAt: p.capturedAt, keywords: p.keywords.map((k: Keyword) => k.word),
       priceDigitalJPY: p.priceDigitalJPY ?? null,
+      pricePrintA2JPY: p.pricePrintA2JPY ?? null,
       urls: {
         original: await getSignedUrl(p.storagePath),
         thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,

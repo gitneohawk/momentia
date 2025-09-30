@@ -49,7 +49,13 @@ export default async function OrderDetailPage({
         <div><span className="text-neutral-500">Email:</span> {order.email ?? "-"}</div>
         <div><span className="text-neutral-500">種類:</span> {order.itemType}</div>
         <div><span className="text-neutral-500">Slug:</span> {order.slug ?? "-"}</div>
-        <div><span className="text-neutral-500">金額:</span> {order.amountJpy.toLocaleString()} 円</div>
+        <div>
+          <span className="text-neutral-500">金額:</span>{" "}
+          {order.amountJpy.toLocaleString()} 円
+          <span className="ml-1 text-xs text-neutral-500">
+            {order.itemType === "panel" ? "（送料込み、税込）" : "（税込）"}
+          </span>
+        </div>
         <div><span className="text-neutral-500">通貨:</span> {order.currency}</div>
         <div><span className="text-neutral-500">ステータス:</span> {order.status}</div>
       </div>
