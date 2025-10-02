@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type Inquiry = {
   id: string;
@@ -28,7 +29,7 @@ export default function AdminInquiriesPage() {
         if (!res.ok) throw new Error("failed");
         const j = await res.json();
         if (alive) setItems(j.items ?? []);
-      } catch (e) {
+      } catch (_e) {
         if (alive) setErr("読み込みに失敗しました");
       } finally {
         if (alive) setLoading(false);
@@ -51,7 +52,7 @@ export default function AdminInquiriesPage() {
       });
       if (!res.ok) throw new Error("failed");
       setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status } : x)));
-    } catch (e) {
+    } catch (_e) {
       alert("更新に失敗しました");
     } finally {
       setSavingId(null);
@@ -100,9 +101,28 @@ export default function AdminInquiriesPage() {
                   <td className="px-3 py-2 whitespace-nowrap">
                     <a href={`mailto:${it.email}`} className="text-blue-700 hover:underline">{it.email}</a>
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">{it.subject ?? "-"}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {it.subject ? (
+                      <Link
+                        href={`/admin/inquiries/${it.id}`}
+                        className="underline underline-offset-4 hover:text-neutral-700"
+                        title="詳細を開く"
+                      >
+                        {it.subject}
+                      </Link>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 max-w-[28rem]">
                     <div className="line-clamp-3 text-neutral-700 break-words">{it.message}</div>
+                    <Link
+                      href={`/admin/inquiries/${it.id}`}
+                      className="text-xs text-blue-700 underline ml-1"
+                      title="全文を表示"
+                    >
+                      全文
+                    </Link>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className={

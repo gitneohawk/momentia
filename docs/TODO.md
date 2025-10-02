@@ -65,6 +65,8 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
    - アップロードやAPIルートにレート制限・サイズ制限を適用
    - 本番前に脆弱性診断（SAST/DAST）と手動ペンテ（優先度高）
    - 依存パッケージの監視（Dependabot／npm audit）と署名付きリリースの採用を検討
+- [ ] メール送信における入力サニタイズとヘッダインジェクション対策（`\r\n` 除去、本文はXSSサニタイズ済み）
+- [ ] 本番リリース前に管理者認可方式を **RBAC（Entra ID App Roles / Groups）** に移行（現状はメールドメインで暫定許可）
 
 ## 監視・ログ・アラート計画
 - **アプリ／インフラ監視**
@@ -138,11 +140,21 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 
 ## 問い合わせフォーム / メール通知関連
 
+- [ ] （暫定）管理者通知メールは **Azure Communication Services のマネージドドメイン** から送信する
+  - 変数: `EMAIL_FROM`（例: `no-reply@momentiacom.japan.communication.azure.com` または `no-reply@<resource-name>.azurecomm.net`）
+  - 変数: `EMAIL_TO_ADMIN`（例: `owner@evoluzio.com`）
+  - 実装: `src/lib/mailer.ts` を `EMAIL_CONNECTION_STRING / EMAIL_FROM / EMAIL_TO_ADMIN` に対応させる
+  - ログ: 送信リクエストとレスポンスIDを `info` で記録、失敗時は `error`
+  - リトライ: 5xx のとき指数バックオフで 3 回まで
+- [ ] （切替）`evoluzio.com` の DKIM2 / SPF Verified 後に **From を `info@evoluzio.com` に変更**
+  - 変数: `EMAIL_FROM=info@evoluzio.com` に差し替え、ステージングでテスト後に本番適用
 - [ ] 問い合わせフォーム実装
   - /contact ページで Name / Email / Message 入力
   - DBに Inquiry テーブル追加（id, name, email, message, createdAt, status=new）
   - 保存後 info@evoluzio.com へ通知メール送信
   - 管理画面 /admin/inquiries で一覧・ステータス管理可能にする
+
+※ フォーム送信→DB保存→管理画面一覧/詳細は実装済み。通知メールのみ未実装。
 
 - [ ] 決済完了通知メール
   - Stripe Webhook → DB保存後、購入者にメール送信

@@ -120,7 +120,6 @@ export async function DELETE(
     const { slug } = await params;
     // Structured diagnostics helper
     const logErr = (label: string, err: unknown) => {
-      // eslint-disable-next-line no-console
       console.error(`[photo:DELETE] ${label} slug=${slug}`, err);
     };
 
@@ -157,7 +156,6 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true, warnings: (typeof blobErrors !== "undefined" && blobErrors.length) ? { blobErrors } : undefined });
   } catch (e: any) {
-    // eslint-disable-next-line no-console
     console.error(`[photo:DELETE] unhandled slug=${(await params as any)?.slug ?? "unknown"}`, e);
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }

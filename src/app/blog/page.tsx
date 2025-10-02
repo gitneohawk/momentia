@@ -3,6 +3,10 @@ import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import Pagination from "@/components/Pagination";
 
+function getHeroUrl(heroPath: string | null | undefined) {
+  return heroPath ? `/api/blog/image/${heroPath}` : undefined;
+}
+
 export const revalidate = 60;
 
 type SearchParams = Promise<{ page?: string }>;
@@ -39,6 +43,7 @@ export default async function BlogIndexPage({
       description: true,
       tags: true,
       publishedAt: true,
+      heroPath: true,
     },
   });
 
@@ -52,6 +57,14 @@ export default async function BlogIndexPage({
             key={p.id}
             className="rounded-2xl border p-5 hover:shadow-md transition-shadow"
           >
+            {p.heroPath ? (
+              <img
+                src={getHeroUrl(p.heroPath)}
+                alt={p.title}
+                className="mb-3 rounded-lg w-full object-cover"
+                loading="lazy"
+              />
+            ) : null}
             <Link href={`/blog/${p.slug}`} className="block">
               <h2 className="text-xl font-medium">{p.title}</h2>
             </Link>

@@ -145,9 +145,9 @@ export async function GET() {
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
       status: 200,
     });
-  } catch (e: any) {
-    console.error("/api/admin/photos GET error:", e);
-    return new NextResponse(JSON.stringify({ error: String(e?.message || e) }), {
+  } catch (_err: any) {
+    console.error("/api/admin/photos GET error:", _err);
+    return new NextResponse(JSON.stringify({ error: String(_err?.message || _err) }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
     });

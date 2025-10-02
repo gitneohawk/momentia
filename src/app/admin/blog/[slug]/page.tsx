@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { blogMdxTemplate } from "@/lib/mdxTemplates";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+const BlogImageUploader = dynamic(() => import("@/components/BlogImageUploader"), { ssr: false });
 
 type Form = {
   slug: string; title: string; description: string;
@@ -13,6 +16,7 @@ export default function AdminBlogEdit() {
   const params = useParams<{ slug: string | string[] }>();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const router = useRouter();
+  const slugDep = slug ?? "";
 
   const [form, setForm] = useState<Form>({
     slug: "", title: "", description: "", heroPath: "",
@@ -25,9 +29,9 @@ export default function AdminBlogEdit() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      if (!slug) { setLoading(false); return; }
+      if (!slugDep) { setLoading(false); return; }
       try {
-        const res = await fetch(`/api/admin/blog/${slug}`, { cache: "no-store" });
+        const res = await fetch(`/api/admin/blog/${slugDep}`, { cache: "no-store" });
         if (!res.ok) { setMsg("記事を取得できませんでした"); return; }
         const p = await res.json();
         setForm({
@@ -47,7 +51,7 @@ export default function AdminBlogEdit() {
         setLoading(false);
       }
     })();
-  }, [slug ?? ""]);
+  }, [slugDep]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +112,16 @@ export default function AdminBlogEdit() {
           </div>
           <div>
             <label className="block text-sm font-medium">Hero Path</label>
-            <input className="mt-1 w-full border rounded px-3 py-2" value={form.heroPath} onChange={e=>setForm(f=>({...f, heroPath:e.target.value}))} placeholder="/og/xxx.jpg or https://..." />
+            <input
+              id="heroPath"
+              className="mt-1 w-full border rounded px-3 py-2"
+              value={form.heroPath}
+              onChange={e => setForm(f => ({ ...f, heroPath: e.target.value }))}
+              placeholder="hero/xxx.jpg (Blob key)"
+            />
+            <div className="mt-2">
+              <BlogImageUploader heroInputId="heroPath" />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium">Tags (comma separated)</label>
@@ -138,14 +151,15 @@ export default function AdminBlogEdit() {
             >
               テンプレ挿入
             </button>
-            <a
+            <Link
               href={`/blog/${slug}`}
               target="_blank"
               rel="noreferrer"
+              prefetch={false}
               className="px-3 py-2 rounded border border-neutral-300 hover:bg-neutral-50"
             >
               公開ページ
-            </a>
+            </Link>
             <button
               type="button"
               onClick={del}

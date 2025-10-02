@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+async function assertAdmin() {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email ?? "";
+  return email.endsWith("@evoluzio.com");
+}
+
 // GET /api/admin/blog  -> list posts (optionally filter)
 export async function GET(req: Request) {
+  if (!(await assertAdmin())) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
@@ -35,20 +46,16 @@ export async function GET(req: Request) {
       take: limit,
     });
     return NextResponse.json({ posts, items: posts, total: posts.length });
-  } catch (e: any) {
-    if (
-      e.message &&
-      typeof e.message === "string" &&
-      e.message.toLowerCase().includes("unauthorized")
-    ) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  } catch (_e: any) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
 // POST /api/admin/blog  -> create or upsert a post
 export async function POST(req: Request) {
+  if (!(await assertAdmin())) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   try {
     const body = await req.json();
     const {
@@ -68,6 +75,10 @@ export async function POST(req: Request) {
       );
     }
 
+    const tagsNorm = Array.isArray(tags)
+      ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20)
+      : [];
+
     const now = new Date();
     const post = await prisma.post.upsert({
       where: { slug },
@@ -75,7 +86,7 @@ export async function POST(req: Request) {
         title,
         description: description ?? null,
         heroPath: heroPath ?? null,
-        tags: Array.isArray(tags) ? tags : [],
+        tags: tagsNorm,
         bodyMdx,
         published: !!published,
         publishedAt: published ? now : null,
@@ -86,21 +97,15 @@ export async function POST(req: Request) {
         title,
         description: description ?? null,
         heroPath: heroPath ?? null,
-        tags: Array.isArray(tags) ? tags : [],
+        tags: tagsNorm,
         bodyMdx,
         published: !!published,
         publishedAt: published ? now : null,
+        updatedAt: now,
       },
     });
     return NextResponse.json({ ok: true, post });
-  } catch (e: any) {
-    if (
-      e.message &&
-      typeof e.message === "string" &&
-      e.message.toLowerCase().includes("unauthorized")
-    ) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    return NextResponse.json({ error: e?.message || "create failed" }, { status: 400 });
+  } catch (_e: any) {
+    return NextResponse.json({ error: _e?.message || "create failed" }, { status: 400 });
   }
 }
