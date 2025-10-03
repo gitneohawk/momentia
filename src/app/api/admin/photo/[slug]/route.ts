@@ -1,3 +1,24 @@
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+  try {
+    const { slug } = await params;
+    const photo = await prisma.photo.findUnique({
+      where: { slug },
+      include: { variants: true, keywords: true },
+    });
+    if (!photo) return NextResponse.json({ error: "not found" }, { status: 404 });
+    // Return full snapshot (sellDigital/sellPanel will be present if in schema)
+    return NextResponse.json({ ok: true, photo });
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
+}
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BlobServiceClient } from "@azure/storage-blob";
@@ -32,6 +53,9 @@ export async function PATCH(
     const data: Record<string, any> = {};
     if (typeof body.caption === "string") data.caption = body.caption;
     if (typeof body.published === "boolean") data.published = body.published;
+    // New: selling flags
+    if (typeof body.sellDigital === "boolean") data.sellDigital = body.sellDigital;
+    if (typeof body.sellPanel === "boolean") data.sellPanel = body.sellPanel;
 
     // Accept price updates (supports multiple payload shapes)
     // Allowed keys: priceDigitalJPY (preferred), price, priceJPY

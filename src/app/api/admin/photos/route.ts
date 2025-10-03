@@ -130,7 +130,10 @@ export async function GET() {
           height: p.height,
           caption: p.caption,
           published: p.published,
+          sellDigital: (p as any)?.sellDigital ?? true,
+          sellPanel: (p as any)?.sellPanel ?? true,
           priceDigitalJPY: p.priceDigitalJPY ?? null,
+          pricePrintA2JPY: p.pricePrintA2JPY ?? null,
           keywords: p.keywords?.map((k) => k.word) ?? [],
           urls: {
             original: await getSignedUrl(p.storagePath),

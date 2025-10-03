@@ -62,9 +62,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
         <footer className="text-center text-sm text-neutral-500 space-y-2">
           <div className="space-x-4">
-            <Link href="/license" className="hover:underline">ライセンス</Link>
-            <Link href="/terms" className="hover:underline">利用規約</Link>
-            <Link href="/privacy" className="hover:underline">プライバシー</Link>
+            <Link href="/legal/license" className="hover:underline">ライセンス</Link>
+            <Link href="/legal/terms" className="hover:underline">利用規約</Link>
+            <Link href="/legal/privacy" className="hover:underline">プライバシー</Link>
             <Link href="/contact" className="hover:underline">お問い合わせ</Link>
           </div>
           <p>

@@ -20,6 +20,8 @@ type Item = {
   keywords: string[];
   priceDigitalJPY?: number | null; // ← 追加
   pricePrintA2JPY?: number | null;
+  sellDigital?: boolean;
+  sellPanel?: boolean;
   urls: { thumb: string | null; large: string | null; original?: string };
 };
 
@@ -72,6 +74,17 @@ export default function GalleryPage() {
   const active = index >= 0 ? visibleItems[index] : null;
   const priceDigital = (active?.priceDigitalJPY ?? 11000) as number;
   const pricePrintA2 = (active?.pricePrintA2JPY ?? 55000) as number;
+
+  const canDigital = active ? (active.sellDigital ?? true) : true;
+  const canPanel = active ? (active.sellPanel ?? true) : true;
+  const hasAnyPurchase = canDigital || canPanel;
+  const purchaseLabel = canDigital && canPanel
+    ? `Purchase ¥${priceDigital.toLocaleString()}（税込） / A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
+    : canDigital
+      ? `Purchase データ ¥${priceDigital.toLocaleString()}（税込）`
+      : canPanel
+        ? `Purchase A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
+        : '';
 
   return (
     <div className="bg-neutral-50">
@@ -143,7 +156,7 @@ export default function GalleryPage() {
           toolbar={{
             buttons: [
               <div key="purchase-info" className="yarl__button flex items-center gap-4">
-                {active && (
+                {active && hasAnyPurchase && (
                   <>
                     <button
                       type="button"
@@ -158,9 +171,7 @@ export default function GalleryPage() {
                       aria-label="Purchase this photo"
                     >
                       <>
-                        <span className="hidden md:inline">
-                          Purchase ¥{priceDigital.toLocaleString()}（税込） / A2 ¥{pricePrintA2.toLocaleString()}（送料込み、税込）
-                        </span>
+                        <span className="hidden md:inline">{purchaseLabel}</span>
                         <span className="md:hidden">Purchase</span>
                       </>
                     </button>

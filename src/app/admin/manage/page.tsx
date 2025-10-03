@@ -12,6 +12,8 @@ type Item = {
   published: boolean;
   priceDigitalJPY: number | null; // ← 追加
   pricePrintA2JPY?: number | null;
+  sellDigital: boolean;
+  sellPanel: boolean;
   urls: { thumb: string | null; large: string | null; original: string };
 };
 
@@ -103,6 +105,8 @@ export default function AdminManagePage() {
       const arr = (json?.items ?? []).map((x: any) => ({
         ...x,
         keywords: Array.isArray(x?.keywords) ? x.keywords : [],
+        sellDigital: typeof x?.sellDigital === "boolean" ? x.sellDigital : true,
+        sellPanel: typeof x?.sellPanel === "boolean" ? x.sellPanel : true,
       }));
       setItems(arr as Item[]);
     } catch (err: any) {
@@ -141,6 +145,24 @@ export default function AdminManagePage() {
     }
     setMsg(value ? "Published" : "Unpublished");
     setItems((prev) => prev.map((p) => (p.slug === slug ? { ...p, published: value } : p)));
+  };
+
+  const toggleSell = async (slug: string, field: "sellDigital" | "sellPanel", value: boolean) => {
+    setBusy(slug);
+    const res = await fetch(`/api/admin/photo/${slug}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value }),
+    });
+    setBusy(null);
+    if (!res.ok) {
+      setMsg("Update failed");
+      return;
+    }
+    setMsg(`${field === "sellDigital" ? "Digital" : "Panel"} ${value ? "enabled" : "disabled"}`);
+    setItems((prev) =>
+      prev.map((p) => (p.slug === slug ? ({ ...p, [field]: value } as Item) : p))
+    );
   };
 
   const savePrice = async (slug: string, price: number) => {
@@ -221,7 +243,6 @@ export default function AdminManagePage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={refresh} className="border px-3 py-1.5 rounded text-sm">Reload</button>
-          <button onClick={() => signOut()} className="border px-3 py-1.5 rounded text-sm">Sign out</button>
         </div>
       </header>
 
@@ -250,6 +271,28 @@ export default function AdminManagePage() {
                     disabled={busy === it.slug}
                   />
                   <span>{it.published ? "Published" : "Unpublished"}</span>
+                </label>
+              </div>
+
+              {/* 販売可否トグル */}
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={it.sellDigital}
+                    onChange={(e) => toggleSell(it.slug, "sellDigital", e.currentTarget.checked)}
+                    disabled={busy === it.slug}
+                  />
+                  <span>Digital 販売</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={it.sellPanel}
+                    onChange={(e) => toggleSell(it.slug, "sellPanel", e.currentTarget.checked)}
+                    disabled={busy === it.slug}
+                  />
+                  <span>パネル販売</span>
                 </label>
               </div>
 

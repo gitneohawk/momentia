@@ -18,7 +18,10 @@ function mask(s?: string | null, showPrefix = 3) {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }>;
+type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }> & {
+  sellDigital?: boolean | null;
+  sellPanel?: boolean | null;
+};
 
 const container = "photos";
 const ACCOUNT_FROM_ENV = process.env.AZURE_STORAGE_ACCOUNT || null;
@@ -174,6 +177,8 @@ export async function GET(req: Request) {
       capturedAt: p.capturedAt, keywords: p.keywords.map((k: Keyword) => k.word),
       priceDigitalJPY: p.priceDigitalJPY ?? null,
       pricePrintA2JPY: p.pricePrintA2JPY ?? null,
+      sellDigital: p.sellDigital ?? true,
+      sellPanel: p.sellPanel ?? true,
       urls: {
         original: await getSignedUrl(p.storagePath),
         thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,

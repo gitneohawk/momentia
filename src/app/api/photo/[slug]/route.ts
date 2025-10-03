@@ -1,9 +1,15 @@
 // src/app/api/photo/[slug]/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }> & {
+  sellDigital?: boolean | null;
+  sellPanel?: boolean | null;
+};
 
 function blobBaseFromConn(conn?: string) {
   if (!conn) return "";
@@ -18,7 +24,7 @@ export async function GET(
 ) {
   try {
     const { slug } = await ctx.params;
-    const p = await prisma.photo.findUnique({
+    const p: PhotoWithRels | null = await prisma.photo.findUnique({
       where: { slug },
       include: { variants: true, keywords: true },
     });
@@ -38,6 +44,8 @@ export async function GET(
       keywords: p.keywords.map(k => k.word),
       priceDigitalJPY: p.priceDigitalJPY ?? 11000,
       pricePrintA2JPY: p.pricePrintA2JPY ?? 55000,
+      sellDigital: p.sellDigital ?? true,
+      sellPanel: p.sellPanel ?? true,
       urls: {
         original: base + p.storagePath,
         thumb: thumb ? base + thumb.storagePath : null,

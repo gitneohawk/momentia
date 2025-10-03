@@ -13,6 +13,8 @@ type Item = {
   keywords: string[];
   priceDigitalJPY: number;
   pricePrintA2JPY?: number;
+  sellDigital?: boolean;
+  sellPanel?: boolean;
   urls: { thumb: string | null; large: string | null; original: string; watermarked: string };
 };
 
@@ -68,6 +70,18 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   }, [slug]);
 
   useEffect(() => {
+    if (!item) return;
+    const rawD = item.sellDigital;
+    const rawP = item.sellPanel;
+    const flagsProvided = rawD !== undefined || rawP !== undefined;
+    const d = flagsProvided ? !!rawD : true;
+    const p = flagsProvided ? !!rawP : true;
+    if (d && !p) setVariant("digital");
+    else if (!d && p) setVariant("print_a2");
+    // if both true or both false, keep current selection
+  }, [item]);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem("checkoutEmail");
       if (saved) setEmail(saved);
@@ -78,6 +92,14 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
     if (!item) return 0;
     return Math.round(((item.width * item.height) / 1_000_000) * 10) / 10;
   }, [item]);
+
+  // フラグ未設定（両方undefined）の場合は後方互換で両方許可。
+  const rawD = item?.sellDigital;
+  const rawP = item?.sellPanel;
+  const flagsProvided = rawD !== undefined || rawP !== undefined;
+  const canDigital = flagsProvided ? !!rawD : true;
+  const canPanel = flagsProvided ? !!rawP : true;
+  const hasAnyPurchase = canDigital || canPanel;
 
   if (loading || !slug) {
     return (
@@ -109,7 +131,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Purchase</h1>
-          <p className="text-sm text-neutral-600">デジタルダウンロード（個人利用）</p>
+          <p className="text-sm text-neutral-600">デジタル / パネルを選択して購入</p>
         </div>
       </header>
 
@@ -141,11 +163,10 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
           </div>
 
           <div className="grid gap-1 text-sm">
-            <div className="text-neutral-700">
-              解像度: {item.width}×{item.height} px（約{mp}MP）
-            </div>
             <div className="text-neutral-700">形式: JPEG（sRGB）</div>
+            <div className="text-neutral-700">デジタル: 長辺2400px（個人利用・商用利用可）</div>
             <div className="text-neutral-700">想定用途: 個人利用（壁紙・個人プリント等）</div>
+            <div className="text-neutral-700">A2パネル: プロラボで高品質プリントし白枠パネル仕上げ</div>
           </div>
 
           {/* バリアント選択 */}
@@ -166,46 +187,58 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
               <p className="text-xs text-neutral-500">※ テスト中は許可されたメールアドレスのみ購入可能です。</p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setVariant("digital")}
-                className={`text-left rounded-xl border px-4 py-3 ${
-                  variant === "digital" ? "border-black ring-1 ring-black" : "border-neutral-300"
-                }`}
-              >
-                <div className="font-medium">デジタル（商用可）</div>
-                <div className="text-sm text-neutral-600">JPEG / 個人・商用利用可（規約順守）</div>
-                <div className="mt-1 text-lg font-semibold">
-                  ¥{priceDigital.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（税込）</span>
-                </div>
-              </button>
+              {canDigital && (
+                <button
+                  type="button"
+                  onClick={() => setVariant("digital")}
+                  className={`text-left rounded-xl border px-4 py-3 ${
+                    variant === "digital" ? "border-black ring-1 ring-black" : "border-neutral-300"
+                  }`}
+                >
+                  <div className="font-medium">デジタル（商用可）</div>
+                  <div className="text-sm text-neutral-600">JPEG / 個人・商用利用可（規約順守）</div>
+                  <div className="mt-1 text-lg font-semibold">
+                    ¥{priceDigital.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（税込）</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={() => setVariant("print_a2")}
-                className={`text-left rounded-xl border px-4 py-3 ${
-                  variant === "print_a2" ? "border-black ring-1 ring-black" : "border-neutral-300"
-                }`}
-              >
-                <div className="font-medium">A2 プロプリント（パネル）</div>
-                <div className="text-sm text-neutral-600">送料込 / 額装なし / 工房プリント</div>
-                <div className="mt-1 text-lg font-semibold">
-                  ¥{pricePrintA2.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（送料込み、税込）</span>
+              {canPanel && (
+                <button
+                  type="button"
+                  onClick={() => setVariant("print_a2")}
+                  className={`text-left rounded-xl border px-4 py-3 ${
+                    variant === "print_a2" ? "border-black ring-1 ring-black" : "border-neutral-300"
+                  }`}
+                >
+                  <div className="font-medium">A2 プロプリント（パネル）</div>
+                  <div className="text-sm text-neutral-600">送料込 / 額装なし / 工房プリント</div>
+                  <div className="mt-1 text-lg font-semibold">
+                    ¥{pricePrintA2.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（送料込み、税込）</span>
+                  </div>
+                </button>
+              )}
+
+              {!hasAnyPurchase && (
+                <div className="col-span-2 text-sm text-red-600">
+                  現在この写真は販売を停止しています。
                 </div>
-              </button>
+              )}
             </div>
 
-            <div className="flex items-center justify-between mt-1">
-              <div className="text-sm text-neutral-600">
-                {variant === "digital" ? "デジタルファイルのダウンロード（商用可）" : "A2サイズのプリント・パネルを配送"}
+            {hasAnyPurchase && (
+              <div className="flex items-center justify-between mt-1">
+                <div className="text-sm text-neutral-600">
+                  {variant === "digital" ? "デジタルファイルのダウンロード（商用可）" : "A2サイズのプリント・パネルを配送"}
+                </div>
+                <div className="text-2xl font-semibold">
+                  ¥{(variant === "digital" ? priceDigital : pricePrintA2).toLocaleString()}
+                  <span className="text-sm text-neutral-500 ml-2">
+                    {variant === "print_a2" ? "（送料込み、税込）" : "（税込）"}
+                  </span>
+                </div>
               </div>
-              <div className="text-2xl font-semibold">
-                ¥{(variant === "digital" ? priceDigital : pricePrintA2).toLocaleString()}
-                <span className="text-sm text-neutral-500 ml-2">
-                  {variant === "print_a2" ? "（送料込み、税込）" : "（税込）"}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* CTA */}
@@ -215,6 +248,10 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
     onClick={async () => {
       if (!email || !email.includes("@")) {
         alert("メールアドレスを入力してください。");
+        return;
+      }
+      if ((variant === "digital" && !canDigital) || (variant === "print_a2" && !canPanel)) {
+        alert("現在このバリアントは購入できません。");
         return;
       }
       try { localStorage.setItem("checkoutEmail", email); } catch {}
@@ -251,11 +288,13 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   </a>
 </div>
 
-          <div className="text-xs text-neutral-500 leading-relaxed">
-            購入者（個人・法人）は自らの活動や業務において、本画像を商用利用を含めてご利用いただけます。
-            再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は禁止されます。
-            高解像度ファイルには透かしは入りません。詳細は利用規約をご確認ください。
-          </div>
+          {variant === "digital" && (
+            <div className="text-xs text-neutral-500 leading-relaxed">
+              購入者（個人・法人）は自らの活動や業務において、本画像を商用利用を含めてご利用いただけます。
+              再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は禁止されます。
+              高解像度ファイルには透かしは入りません。詳細は利用規約をご確認ください。
+            </div>
+          )}
         </div>
       </div>
     </section>

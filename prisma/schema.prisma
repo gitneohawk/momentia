@@ -23,6 +23,8 @@ model Photo {
   published   Boolean  @default(false)
   priceDigitalJPY Int @default(11000)
   pricePrintA2JPY Int @default(55000)
+  sellDigital     Boolean  @default(true)
+  sellPanel       Boolean  @default(true)
 }
 
 model Variant {
