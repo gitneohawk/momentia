@@ -82,7 +82,7 @@ export default function Home() {
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
             className="mt-4 text-lg md:text-xl text-neutral-200 max-w-2xl mx-auto drop-shadow"
           >
-            光と時間の呼吸を、そっと額に。— 静けさを連れてくる写真たち。
+            光と時間の呼吸を、そっと壁に。— 静けさを連れてくる写真たち。
           </motion.p>
 
           <motion.div

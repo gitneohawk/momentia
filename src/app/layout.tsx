@@ -41,9 +41,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto max-w-6xl px-2 py-4 flex items-center justify-between">
             <div className="flex items-center gap-8">
               <Link href="/" className="flex items-center">
-                <img src="/momentia_logo.svg" alt="Momentia" className="h-10 w-auto align-middle" />
+                <img
+                  src="/momentia_logo.svg"
+                  alt="Momentia"
+                  className="block h-7 md:h-9 w-auto translate-y-[-7px]"
+                />
               </Link>
-              <nav className="flex items-center gap-5 text-sm text-neutral-600 ml-0">
+              <nav className="flex items-center gap-5 text-sm text-neutral-600 ml-2 md:ml-3">
                 <Link href="/gallery" className="hover:text-neutral-900 transition">Gallery</Link>
                 <Link href="/blog" className="hover:text-neutral-900 transition">Blog</Link>
               </nav>
@@ -56,20 +60,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
-        <footer className="mt-16 border-t border-neutral-200/80">
-          <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-neutral-500 flex items-center justify-between bg-white">
-            <span>© {new Date().getFullYear()} Evoluzio Inc.</span>
-            <div className="flex gap-4">
-              <Link href="/legal/license" className="hover:text-neutral-900 transition">ライセンス</Link>
-              <Link href="/legal/terms" className="hover:text-neutral-900 transition">利用規約</Link>
-              <Link href="/legal/privacy" className="hover:text-neutral-900 transition">プライバシー</Link>
-              <Link href="/contact" className="hover:text-neutral-900 transition">お問い合わせ</Link>
-            </div>
-            <a href="https://evoluzio.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:opacity-90 transition">
-              <span>Powered by</span>
-              <img src="/logos/Evoluzio_Logo.png" alt="Evoluzio Inc." className="h-5 w-auto" />
-            </a>
+        <footer className="text-center text-sm text-neutral-500 space-y-2">
+          <div className="space-x-4">
+            <Link href="/license" className="hover:underline">ライセンス</Link>
+            <Link href="/terms" className="hover:underline">利用規約</Link>
+            <Link href="/privacy" className="hover:underline">プライバシー</Link>
+            <Link href="/contact" className="hover:underline">お問い合わせ</Link>
           </div>
+          <p>
+            © 2025 <a href="https://www.evoluzio.com" target="_blank" rel="noopener noreferrer" className="hover:underline">
+              Evoluzio Inc.
+            </a>
+          </p>
         </footer>
         </Providers>
       </body>
