@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth/next";
-import { sendMail } from "@/lib/mailer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +14,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get("to") || session.user.email;
   const subject = searchParams.get("subject") || "Test Email";
   try {
+    const { sendMail } = await import("@/lib/mailer");
     await sendMail({
       to,
       subject,
