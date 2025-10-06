@@ -6,10 +6,10 @@ export async function POST(req: NextRequest) {
   try {
     const { itemType, name, amountJpy, slug, customerEmail } = await req.json();
 
-    // ログイン済みユーザのメールを優先（未ログイン時はリクエストの customerEmail を利用）
+    // 入力された customerEmail を最優先に使用（未入力時のみログインメールをフォールバック）
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     const tokenEmail = (token?.email as string | undefined) || undefined;
-    const email = (tokenEmail || customerEmail || '').trim();
+    const email = ((customerEmail && String(customerEmail)) || tokenEmail || '').trim().toLowerCase();
 
     if (!email) {
       return NextResponse.json({ error: 'メールアドレスを入力してください。' }, { status: 400 });
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      customer_creation: 'always',
       customer_email: email,
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase/success${slug ? `?slug=${encodeURIComponent(slug)}` : ''}${slug ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase/cancel`,
