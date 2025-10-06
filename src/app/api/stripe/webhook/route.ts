@@ -85,13 +85,15 @@ export async function POST(req: Request) {
 
     // 4) メール送信（失敗しても 200 を返す。Stripe 側で重複送信されるため冪等に注意）
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ?? "";
+      const baseUrl =
+        (process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ||
+          (process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : ""));
       const adminTo = process.env.ADMIN_NOTICE_TO || process.env.MAIL_FROM || "";
 
       if (itemType === "digital" && email) {
         // 購入者向け（ダウンロード）
         const downloadUrl =
-          downloadToken && baseUrl ? `${baseUrl}/api/download/${downloadToken}` : "";
+          downloadToken && baseUrl ? `${baseUrl}/api/download?token=${downloadToken}` : "";
 
         const mail = tplOrderDigitalUser({
           title: name ?? "(no title)",
