@@ -22,6 +22,37 @@ const brandFooterHtml = `
 </p>
 `;
 
+// Ensure the download URL is the canonical query form: /api/download?token=...
+// Accepts full URL, path-based token (/api/download/<token>), raw token, or already-canonical query string.
+function buildDownloadUrl(input: string): string {
+  const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? "").replace(/\/+$/,"");
+  const s = (input ?? "").trim();
+  if (!s) return `${BASE}/api/download`; // fallback (unlikely)
+
+  // Already absolute URL
+  if (s.includes("://")) return s;
+
+  // Already query style (path or query)
+  if (s.startsWith("/api/download?")) return `${BASE}${s}`;
+
+  // Path style: /api/download/<token>
+  if (s.startsWith("/api/download/")) {
+    const token = s.substring("/api/download/".length).split(/[?#]/)[0];
+    if (token) return `${BASE}/api/download?token=${token}`;
+  }
+
+  // Raw 64-hex token
+  if (/^[a-f0-9]{64}$/i.test(s)) {
+    return `${BASE}/api/download?token=${s}`;
+  }
+
+  // Any other relative path
+  if (s.startsWith("/")) return `${BASE}${s}`;
+
+  // Fallback to query style
+  return `${BASE}/api/download?token=${encodeURIComponent(s)}`;
+}
+
 // ————— Order: Digital to User —————
 export function tplOrderDigitalUser(params: {
   title: string;
@@ -30,14 +61,14 @@ export function tplOrderDigitalUser(params: {
   price: number;
   orderId?: string;
 }) {
-  const { title, downloadUrl, price, orderId } = params;
+  const { title, downloadUrl, price, orderId } = params; const url = buildDownloadUrl(downloadUrl);
   const subject = `【Momentia】デジタル画像のダウンロード方法${orderId ? `（注文番号: ${orderId}）` : ""}`;
 
   const text = `この度はご購入ありがとうございます。
 商品: ${title}
 注文番号: ${orderId ?? "-"}
 金額: ${fmtJPY(price)}
-ダウンロードURL: ${downloadUrl}
+ダウンロードURL: ${url}
 ※URLは一定期間で失効します。お早めに保存ください。
 ※本画像は個人・商用利用可（規約順守）。再配布・再販売・第三者への譲渡、商品化は不可です。
 ${brandFooterText}`;
@@ -47,7 +78,7 @@ ${brandFooterText}`;
   <p><b>商品:</b> ${title}<br/>
      <b>注文番号:</b> ${orderId ?? "-"}<br/>
      <b>金額:</b> ${fmtJPY(price)}</p>
-  <p><a href="${downloadUrl}">ダウンロードはこちら</a><br/>
+  <p><a href="${url}">ダウンロードはこちら</a><br/>
   <small>※URLは一定期間で失効します。お早めに保存ください。</small></p>
   <p style="font-size:12px;color:#555">
     本画像は個人・商用利用可（規約順守）。再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は不可です。<br/>
