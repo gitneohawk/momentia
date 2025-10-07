@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma"; // 既存のPrisma helperがあればそれを使用
 import xss from "xss"; // if not installed, keep fallback sanitizer below
+import { sendMail } from "@/lib/mailer";
+import { tplInquiryAutoReply, tplInquiryAdminNotice } from "@/lib/mail-templates";
 
 const headerSafe = (s: string) => !/[\r\n]/.test(s); // prevent header injection
 
@@ -111,7 +113,7 @@ export async function POST(req: Request) {
     const safeSubject = data.subject ? sanitize(data.subject) : undefined;
     const safeMsg = sanitize(data.message);
 
-    await prisma.inquiry.create({
+    const saved = await prisma.inquiry.create({
       data: {
         name: safeName,
         email: data.email,
@@ -122,8 +124,34 @@ export async function POST(req: Request) {
       },
     });
 
-    // TODO: 通知メール（Azure Communication Email）：ドメインリンクが完了したら有効化
-    // await sendInquiryNotification(...)
+    // 通知メール（Azure Communication Email）
+    try {
+      // ユーザー宛 自動返信
+      const auto = tplInquiryAutoReply(saved.name || undefined);
+      await sendMail({
+        to: saved.email,
+        subject: auto.subject,
+        text: auto.text,
+        html: auto.html,
+      });
+
+      // 運営宛 通知
+      const admin = tplInquiryAdminNotice({
+        name: saved.name ?? "(名無し)",
+        email: saved.email,
+        subject: saved.subject ?? undefined,
+        message: saved.message,
+      });
+      await sendMail({
+        to: process.env.ADMIN_NOTICE_TO || process.env.MAIL_REPLY_TO || "info@evoluzio.com",
+        subject: admin.subject,
+        text: admin.text,
+        html: admin.html,
+      });
+    } catch (err) {
+      // メール失敗は API を失敗にしない（ログのみ）
+      console.error("[inquiry mail error]", err);
+    }
 
     return NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (e: any) {
