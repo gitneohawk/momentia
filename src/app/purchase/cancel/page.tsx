@@ -1,12 +1,8 @@
 // src/app/purchase/cancel/page.tsx
 import Link from "next/link";
 
-export default function PurchaseCancelPage({
-  searchParams,
-}: {
-  searchParams?: { slug?: string };
-}) {
-  const slug = searchParams?.slug;
+export default function PurchaseCancelPage(props: any) {
+  const slug = props?.searchParams?.slug as string | undefined;
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
       <h1 className="text-2xl font-semibold mb-4">決済が完了しませんでした</h1>
