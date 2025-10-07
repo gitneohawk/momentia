@@ -9,12 +9,12 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 
 ## 優先度が高いタスク
 1. Azure Container AppsとDNSでカスタムドメイン（momentia.evoluzio.com）を設定
-2. ブログ画像用に別のAzure Blobコンテナを用意（ギャラリーとは別）
-3. 決済フローを実装（Stripe Checkoutによる国内消費税対応、日本限定を優先。PayPalは後でオプションとして追加）
-4. 問い合わせフォームの実装（注文IDを紐付け、管理画面で確認可能にする）
+2. [x] ブログ画像用に別のAzure Blobコンテナを用意（ギャラリーとは別／プライベート運用・API配信）
+3. [x] 決済フローを実装（Stripe Checkout：国内消費税対応・日本限定／購入完了メール連携）
+4. [x] 問い合わせフォームの実装（DB保存・管理画面一覧/詳細・自動返信/運営通知メール）
 5. [x] 注文ステータス管理（paid/processing/shipped/canceled）と管理画面からの更新機能（完了）
-6. デジタル販売用の画像をピクセル揃えて出力しなおす（統一解像度）
-7. 値段表示を調整：デジタル商品は「（税込）」、パネル商品は「（送料込み・税込）」と明記
+6. [x] デジタル販売用の画像をピクセル揃えて出力（長辺2400pxに統一／sharp生成）
+7. [x] 値段表示を調整：デジタル商品は「（税込）」、パネル商品は「（送料込み・税込）」と明記（全画面反映済み）
 8. ペネトレーションテストを実施（認証・決済・管理画面／APIを対象に、外部委託＋自動スキャンの二段構え）
 9. ログ／監視／アラートを整備（Azure Monitor・Container Apps・PostgreSQL・Stripe Webhook失敗の監視と通知）
 
@@ -91,6 +91,11 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - スタイリングは現行の`prose`タイポグラフィ設定と一貫性を保つ。
 - 決済はまずStripe Checkoutを導入、PayPalは後で追加可能。Amazon Payは将来的に検討。
 
+## 追加タスク（ブログ／OGP）
+- [ ] /blog 一覧・詳細で `heroPath` をサムネイル／OGP 画像に利用（未設定時はデフォルト画像を表示）
+- [ ] OGPデフォルト画像（ロゴ入り）を `public/ogp-default.png` として用意し共通化
+- [ ] /admin/blog/new にアップロードUIを統合済みだが、`heroPath` 必須バリデーションをAPI側でも担保
+
 ## モバイルUX & パフォーマンス
 
 - [x] ランディング: Featured Works（モバイル）
@@ -137,30 +142,32 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] アラート 5xx, レイテンシ, CPU/メモリ, Postgres 接続エラーを作成
 - [ ] Stripe Webhook 失敗を Dashboard のアラートメールに追加
 - [ ] 監視設定の IaC 化（Bicep/Terraform もしくは `az monitor` スクリプト）
+- [ ] ACS 送信ログを Log Analytics に転送し、配信失敗割合のアラートを作成
+- [ ] Stripe Webhook のイベント処理ログに `orderId` / `customerEmail` を必ず含める（PIIは必要最小限）
 
 ## 問い合わせフォーム / メール通知関連
 
-- [ ] （暫定）管理者通知メールは **Azure Communication Services のマネージドドメイン** から送信する
-  - 変数: `EMAIL_FROM`（例: `no-reply@momentiacom.japan.communication.azure.com` または `no-reply@<resource-name>.azurecomm.net`）
-  - 変数: `EMAIL_TO_ADMIN`（例: `owner@evoluzio.com`）
-  - 実装: `src/lib/mailer.ts` を `EMAIL_CONNECTION_STRING / EMAIL_FROM / EMAIL_TO_ADMIN` に対応させる
-  - ログ: 送信リクエストとレスポンスIDを `info` で記録、失敗時は `error`
-  - リトライ: 5xx のとき指数バックオフで 3 回まで
-- [ ] （切替）`evoluzio.com` の DKIM2 / SPF Verified 後に **From を `info@evoluzio.com` に変更**
-  - 変数: `EMAIL_FROM=info@evoluzio.com` に差し替え、ステージングでテスト後に本番適用
-- [ ] 問い合わせフォーム実装
-  - /contact ページで Name / Email / Message 入力
-  - DBに Inquiry テーブル追加（id, name, email, message, createdAt, status=new）
-  - 保存後 info@evoluzio.com へ通知メール送信
-  - 管理画面 /admin/inquiries で一覧・ステータス管理可能にする
-
-※ フォーム送信→DB保存→管理画面一覧/詳細は実装済み。通知メールのみ未実装。
-
-- [ ] 決済完了通知メール
-  - Stripe Webhook → DB保存後、購入者にメール送信
-  - From: info@evoluzio.com（運営会社アドレスで安心感を与える）
-  - 将来的にブランド強化目的で no-reply@momentia.photo を追加利用検討
+- [x] 送信基盤：Azure Communication Services（ACS）＋ `evoluzio.com` Verified Domain を使用
+  - From: `noreply@evoluzio.com`（ACS sender username 登録済み）
+  - Reply-To: `info@evoluzio.com`
+  - ログ: 送信リクエストとMessageIdを `info` で記録（失敗は `error`）
+- [x] 問い合わせフォーム：DB保存 → ユーザー自動返信 ＆ 運営通知メール（/admin/inquiries で閲覧）
+- [x] 決済完了通知メール（Stripe Webhook）
+  - デジタル：ダウンロードURL（`/api/download?token=...`）を含む購入者メール＋運営通知
+  - パネル：出荷目安テキストを含む購入者メール＋運営通知
+- [ ] リトライ：5xx 時の指数バックオフ（mailer.ts に実装）
+- [ ] バウンス／配信失敗の検知とアラート（Log Analytics → アラート or メール）
+- [ ] 迷惑メール対策：本文と件名の調整、SPF/DKIM/DMARC の継続モニタリング（ACS 側ステータス）
 
 ## ドメイン方針
 - momentia.photo → ブランド用公式ドメイン（Webサービス用）
 - evoluzio.com → 運営会社ドメイン（決済・問い合わせメール送信用）
+
+## リリースチェックリスト
+
+- [ ] Stripe 本番キー・Webhook設定
+- [ ] カスタムドメイン + HTTPS 有効化
+- [ ] ペネトレーションテスト完了
+- [ ] ログ／監視／アラート 最低限稼働
+- [ ] 問い合わせフォーム／決済成功・失敗動作の確認
+- [ ] メール送信の到達性確認（Gmail / Outlook / 携帯キャリア）
