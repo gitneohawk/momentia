@@ -46,7 +46,8 @@ export async function GET(req: Request) {
       take: limit,
     });
     return NextResponse.json({ posts, items: posts, total: posts.length });
-  } catch (_e: any) {
+  } catch (e) {
+    console.error("Error occurred:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -105,7 +106,12 @@ export async function POST(req: Request) {
       },
     });
     return NextResponse.json({ ok: true, post });
-  } catch (_e: any) {
-    return NextResponse.json({ error: _e?.message || "create failed" }, { status: 400 });
+  } catch (e) {
+    console.error("Error occurred:", e);
+    const errorMessage =
+      e && typeof e === "object" && "message" in e && typeof (e as any).message === "string"
+        ? (e as any).message
+        : "create failed";
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 }

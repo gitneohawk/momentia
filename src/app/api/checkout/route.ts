@@ -4,7 +4,9 @@ import { getToken } from 'next-auth/jwt';
 
 export async function POST(req: NextRequest) {
   try {
-    let { itemType, name, amountJpy, slug, customerEmail } = await req.json();
+    const body = await req.json();
+    const { itemType, amountJpy, slug, customerEmail } = body;
+    let { name } = body;
 
     // Strict validations
     if (itemType !== 'digital' && itemType !== 'panel') {
@@ -26,9 +28,7 @@ export async function POST(req: NextRequest) {
     }
     name = name.trim().replace(/\r?\n/g, ' ').slice(0, 120);
 
-    if (slug !== undefined && slug !== null) {
-      slug = String(slug).slice(0, 120);
-    }
+    const safeSlug = slug != null ? String(slug).slice(0, 120) : undefined;
 
     // 入力された customerEmail を最優先に使用（未入力時のみログインメールをフォールバック）
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
       mode: 'payment',
       customer_creation: 'always',
       customer_email: email,
-      success_url: `${baseUrl}/purchase/success?session_id={CHECKOUT_SESSION_ID}${slug ? `&slug=${encodeURIComponent(slug)}` : ''}`,
-      cancel_url: `${baseUrl}/purchase/cancel${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`,
+      success_url: `${baseUrl}/purchase/success?session_id={CHECKOUT_SESSION_ID}${safeSlug ? `&slug=${encodeURIComponent(safeSlug)}` : ''}`,
+      cancel_url: `${baseUrl}/purchase/cancel${safeSlug ? `?slug=${encodeURIComponent(safeSlug)}` : ''}`,
       line_items: [
         {
           price_data: {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         itemType,
         name,
-        ...(slug ? { slug } : {}),
+        ...(safeSlug ? { slug: safeSlug } : {}),
       },
       ...(itemType === 'panel'
         ? { shipping_address_collection: { allowed_countries: ['JP'] } }

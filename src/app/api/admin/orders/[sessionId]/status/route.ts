@@ -29,7 +29,8 @@ export async function PUT(
       return NextResponse.json({ error: "not found" }, { status: 404 });
     }
     return NextResponse.json(updated);
-  } catch (_error) {
+  } catch (err) {
+    console.error("Error occurred:", err);
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }

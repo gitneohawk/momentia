@@ -55,7 +55,6 @@ function rateLimit(ip: string): { ok: boolean; resetAt: number } {
 }
 
 // --- Sanitizers ---
-const stripTags = (s: string) => s.replace(/<[^>]*>/g, "");
 const sanitize = (s: string) => xss(s, {
   whiteList: {},
   stripIgnoreTag: true,

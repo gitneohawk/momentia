@@ -66,7 +66,6 @@ function getPublicBase(endpoint: string) {
 }
 
 export async function GET(req: Request) {
-  const t0 = Date.now();
   const searchParams = new URL(req.url).searchParams;
   const q = searchParams.get("q")?.trim();
   const kw = searchParams.get("keyword")?.trim();
@@ -166,7 +165,7 @@ export async function GET(req: Request) {
       take: limit,
     });
   } catch (err) {
-    return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+    console.error("Error occurred:", err); // エラー内容をログに出力
   }
 
   const items = await Promise.all(photos.map(async (p) => {

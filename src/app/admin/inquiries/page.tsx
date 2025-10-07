@@ -29,7 +29,7 @@ export default function AdminInquiriesPage() {
         if (!res.ok) throw new Error("failed");
         const j = await res.json();
         if (alive) setItems(j.items ?? []);
-      } catch (_e) {
+      } catch {
         if (alive) setErr("読み込みに失敗しました");
       } finally {
         if (alive) setLoading(false);
@@ -52,7 +52,7 @@ export default function AdminInquiriesPage() {
       });
       if (!res.ok) throw new Error("failed");
       setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status } : x)));
-    } catch (_e) {
+    } catch {
       alert("更新に失敗しました");
     } finally {
       setSavingId(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn, } from "next-auth/react";
 
 type Item = {
   slug: string;

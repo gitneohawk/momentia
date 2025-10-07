@@ -1,6 +1,6 @@
 // src/app/purchase/[slug]/page.tsx
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export const runtime = "nodejs"; // 画像URL直叩きなどサーバフェッチ想定（ページ自体はCSR）
 export const dynamic = "force-dynamic";
@@ -87,11 +87,6 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
       if (saved) setEmail(saved);
     } catch {}
   }, []);
-
-  const mp = useMemo(() => {
-    if (!item) return 0;
-    return Math.round(((item.width * item.height) / 1_000_000) * 10) / 10;
-  }, [item]);
 
   // フラグ未設定（両方undefined）の場合は後方互換で両方許可。
   const rawD = item?.sellDigital;
