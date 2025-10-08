@@ -26,9 +26,14 @@ export async function POST(req: Request) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
+    console.error("[ALERT][STRIPE_WEBHOOK_ERROR][CONSTRUCT_EVENT]", {
+      message: String(err),
+    });
     // 署名不一致など
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
+
+  console.info("[STRIPE_WEBHOOK_RECEIVED]", { id: event.id, type: event.type });
 
   if (event.type === "checkout.session.completed") {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -44,11 +49,21 @@ export async function POST(req: Request) {
     const pi = typeof full.payment_intent === "string" ? null : full.payment_intent;
     const shipping = pi?.shipping ?? null;
 
-    // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
-    const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
+    const orderId = full.id;
     const itemType = (meta.itemType as "digital" | "panel" | undefined) ?? "unknown";
     const name = meta.name ?? null;
     const slug = meta.slug ?? null;
+
+    console.info("[STRIPE_WEBHOOK_PROCESSING]", {
+      id: event.id,
+      type: event.type,
+      orderId,
+      itemType,
+      slug,
+    });
+
+    // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
+    const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
 
     // デジタル用ダウンロードトークン（必要時のみ発行）
     let downloadToken: string | null = null;
@@ -78,7 +93,18 @@ export async function POST(req: Request) {
           downloadToken,
         },
       });
+      console.info("[STRIPE_WEBHOOK_OK][DB_SAVED]", {
+        orderId: full.id,
+        itemType,
+        slug,
+      });
     } catch (dbErr) {
+      console.error("[ALERT][STRIPE_WEBHOOK_ERROR][DB_SAVE_FAILED]", {
+        orderId: full.id,
+        itemType,
+        slug,
+        error: String(dbErr),
+      });
       console.error("[webhook] failed to save order", dbErr);
       return new NextResponse("DB Error", { status: 500 });
     }
@@ -109,6 +135,11 @@ export async function POST(req: Request) {
           html: mail.html,
           text: mail.text,
         });
+        console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
+          orderId: full.id,
+          itemType,
+          to: email,
+        });
 
         // 管理者通知
         if (adminTo) {
@@ -125,6 +156,11 @@ export async function POST(req: Request) {
             subject: adminMail.subject,
             html: adminMail.html,
             text: adminMail.text,
+          });
+          console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
+            orderId: full.id,
+            itemType,
+            to: adminTo,
           });
         }
       } else if (itemType === "panel" && email) {
@@ -144,6 +180,11 @@ export async function POST(req: Request) {
           html: mail.html,
           text: mail.text,
         });
+        console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
+          orderId: full.id,
+          itemType,
+          to: email,
+        });
 
         // 管理者通知
         if (adminTo) {
@@ -161,12 +202,23 @@ export async function POST(req: Request) {
             html: adminMail.html,
             text: adminMail.text,
           });
+          console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
+            orderId: full.id,
+            itemType,
+            to: adminTo,
+          });
         }
       }
     } catch (mailErr) {
       // メール失敗はログのみ（Webhookは 200 を返す）
-      console.error("[webhook] mail send failed", mailErr);
+      console.error("[ALERT][STRIPE_WEBHOOK_ERROR][MAIL_FAILED]", {
+        orderId: typeof (event as any)?.data?.object?.id === "string" ? (event as any).data.object.id : undefined,
+        type: event.type,
+        error: String(mailErr),
+      });
     }
+  } else {
+    console.info("[STRIPE_WEBHOOK_IGNORED]", { id: event.id, type: event.type });
   }
 
   return NextResponse.json({ received: true });
