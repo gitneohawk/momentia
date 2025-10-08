@@ -7,7 +7,7 @@ export default function AboutPage() {
   return (
     <div className="bg-white px-6 py-12 max-w-3xl mx-auto rounded-lg shadow mt-8">
       <h1 className="text-3xl font-bold mb-4">写真家について</h1>
-      <div className="flex items-start mb-8">
+      <div className="flex flex-col md:flex-row items-start mb-8">
         <Image
           src="/hawk.jpg"
           alt="写真家のプロフィール写真"
@@ -15,7 +15,7 @@ export default function AboutPage() {
           height={200}
           className="rounded-full shadow"
         />
-        <p className="text-lg text-gray-700 ml-6">
+        <p className="text-lg text-gray-700 mt-4 md:mt-0 md:ml-6">
           写真家：高橋伸和<br />
           経歴：複数の会社の立ち上げと並行してフリーランスの写真家として活動。風景、花、マクロ写真を中心に作品を制作。<br />
 

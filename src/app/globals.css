@@ -5,6 +5,7 @@
   --background: #ffffff;
   --foreground: #171717;
   color-scheme: light; /* 常にライトモードとして扱う */
+  background-color: #ffffff;
 }
 
 @theme inline {
@@ -15,7 +16,6 @@
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100svh; /* モバイル余白対策 */

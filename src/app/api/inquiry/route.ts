@@ -125,8 +125,10 @@ export async function POST(req: Request) {
     });
 
     // 通知メール（Azure Communication Email）
+    let autoReplySuccess = false;
+    let autoReplyError: any = null;
+    // ユーザー宛 自動返信
     try {
-      // ユーザー宛 自動返信
       const auto = tplInquiryAutoReply(saved.name || undefined);
       await sendMail({
         to: saved.email,
@@ -134,23 +136,37 @@ export async function POST(req: Request) {
         text: auto.text,
         html: auto.html,
       });
+      autoReplySuccess = true;
+      console.info("[inquiry mail] auto-reply sent to user:", saved.email);
+    } catch (err) {
+      autoReplySuccess = false;
+      autoReplyError = err;
+      console.error("[inquiry mail error] auto-reply failed:", err);
+    }
 
-      // 運営宛 通知
+    // 運営宛 通知
+    try {
       const admin = tplInquiryAdminNotice({
         name: saved.name ?? "(名無し)",
         email: saved.email,
         subject: saved.subject ?? undefined,
         message: saved.message,
       });
+
+      // 自動返信の成否を追記して運営に送る
+      const statusLineText = `\n---\n[auto-reply]: ${autoReplySuccess ? "succeeded" : "failed"}${autoReplySuccess ? "" : (autoReplyError ? ` (${String(autoReplyError)})` : "")}`;
+      const statusLineHtml = `<hr/><p style="font-size:12px;color:#555">auto-reply: <b>${autoReplySuccess ? "succeeded" : "failed"}</b>${autoReplySuccess ? "" : (autoReplyError ? ` (${String(autoReplyError)})` : "")}</p>`;
+
       await sendMail({
         to: process.env.ADMIN_NOTICE_TO || process.env.MAIL_REPLY_TO || "info@evoluzio.com",
         subject: admin.subject,
-        text: admin.text,
-        html: admin.html,
+        text: admin.text + statusLineText,
+        html: admin.html + statusLineHtml,
       });
+
+      console.info("[inquiry mail] admin notice sent. Auto-reply status:", autoReplySuccess ? "succeeded" : "failed");
     } catch (err) {
-      // メール失敗は API を失敗にしない（ログのみ）
-      console.error("[inquiry mail error]", err);
+      console.error("[inquiry mail error] admin notice failed:", err, "Auto-reply status:", autoReplySuccess ? "succeeded" : "failed");
     }
 
     return NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
