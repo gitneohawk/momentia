@@ -179,11 +179,19 @@ export async function POST(req: Request) {
           orderId: full.id,
         });
 
+        // Append invoice link if available (without changing template types)
+        const finalHtmlUser = _invoiceUrl
+          ? `${mail.html}<p style="margin-top:12px">領収書PDF: <a href="${_invoiceUrl}">こちら</a></p>`
+          : mail.html;
+        const finalTextUser = _invoiceUrl
+          ? `${mail.text}\n\n領収書PDF: ${_invoiceUrl}`
+          : mail.text;
+
         await sendMail({
           to: email,
           subject: mail.subject,
-          html: mail.html,
-          text: mail.text,
+          html: finalHtmlUser,
+          text: finalTextUser,
         });
         console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
           orderId: full.id,
@@ -209,11 +217,17 @@ export async function POST(req: Request) {
             amount: amountJpy,
             orderId: full.id,
           });
+          const adminHtml = _invoiceUrl
+            ? `${adminMail.html}<p style="margin-top:8px">Invoice URL: <a href="${_invoiceUrl}">${_invoiceUrl}</a></p>`
+            : adminMail.html;
+          const adminText = _invoiceUrl
+            ? `${adminMail.text}\n\nInvoice URL: ${_invoiceUrl}`
+            : adminMail.text;
           await sendMail({
             to: adminTo,
             subject: adminMail.subject,
-            html: adminMail.html,
-            text: adminMail.text,
+            html: adminHtml,
+            text: adminText,
           });
           console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
             orderId: full.id,
@@ -233,11 +247,19 @@ export async function POST(req: Request) {
           orderId: full.id,
         });
 
+        // Append invoice link if available
+        const finalHtmlUser = _invoiceUrl
+          ? `${mail.html}<p style="margin-top:12px">領収書PDF: <a href="${_invoiceUrl}">こちら</a></p>`
+          : mail.html;
+        const finalTextUser = _invoiceUrl
+          ? `${mail.text}\n\n領収書PDF: ${_invoiceUrl}`
+          : mail.text;
+
         await sendMail({
           to: email,
           subject: mail.subject,
-          html: mail.html,
-          text: mail.text,
+          html: finalHtmlUser,
+          text: finalTextUser,
         });
         console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
           orderId: full.id,
@@ -262,11 +284,17 @@ export async function POST(req: Request) {
             amount: amountJpy,
             orderId: full.id,
           });
+          const adminHtml = _invoiceUrl
+            ? `${adminMail.html}<p style="margin-top:8px">Invoice URL: <a href="${_invoiceUrl}">${_invoiceUrl}</a></p>`
+            : adminMail.html;
+          const adminText = _invoiceUrl
+            ? `${adminMail.text}\n\nInvoice URL: ${_invoiceUrl}`
+            : adminMail.text;
           await sendMail({
             to: adminTo,
             subject: adminMail.subject,
-            html: adminMail.html,
-            text: adminMail.text,
+            html: adminHtml,
+            text: adminText,
           });
           console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
             orderId: full.id,

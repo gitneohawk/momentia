@@ -1,4 +1,3 @@
-
 // Centralized e-mail templates for Momentia
 // Note: headers like from/reply-to are set by the sender (mailer.ts / API).
 // These templates only return subject/text/html bodies.
@@ -58,6 +57,15 @@ function buildDownloadUrl(input: string): string {
   return `${BASE}/api/download?token=${encodeURIComponent(s)}`;
 }
 
+// Normalize an optional absolute/relative URL against SITE_URL.
+function normalizeUrl(input?: string): string {
+  const s = (input ?? "").trim();
+  if (!s) return "";
+  if (s.includes("://")) return s;
+  if (s.startsWith("/")) return `${SITE_URL}${s}`;
+  return s;
+}
+
 // ————— Order: Digital to User —————
 export function tplOrderDigitalUser(params: {
   title: string;
@@ -65,8 +73,11 @@ export function tplOrderDigitalUser(params: {
   downloadUrl: string;
   price: number;
   orderId?: string;
+  invoiceUrl?: string; // optional: invoice PDF link
 }) {
-  const { title, downloadUrl, price, orderId } = params; const url = buildDownloadUrl(downloadUrl);
+  const { title, downloadUrl, price, orderId, invoiceUrl } = params;
+  const url = buildDownloadUrl(downloadUrl);
+  const inv = normalizeUrl(invoiceUrl);
   const subject = `【Momentia】デジタル画像のダウンロード方法${orderId ? `（注文番号: ${orderId}）` : ""}`;
 
   const text = `この度はご購入ありがとうございます。
@@ -76,7 +87,7 @@ export function tplOrderDigitalUser(params: {
 ダウンロードURL: ${url}
 ※URLは一定期間で失効します。お早めに保存ください。
 ※本画像は個人・商用利用可（規約順守）。再配布・再販売・第三者への譲渡、商品化は不可です。
-${brandFooterText}`;
+${inv ? `領収書PDF: ${inv}\n` : ""}${brandFooterText}`;
 
   const html = `
   <p>この度はご購入ありがとうございます。</p>
@@ -89,6 +100,7 @@ ${brandFooterText}`;
     本画像は個人・商用利用可（規約順守）。再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は不可です。<br/>
     詳細はサイトの利用規約をご確認ください。
   </p>
+  ${inv ? `<p><a href="${inv}">領収書PDFはこちら</a></p>` : ""}
   ${brandFooterHtml}
   `;
   return { subject, text, html };
@@ -100,8 +112,10 @@ export function tplOrderPanelUser(params: {
   price: number;
   eta: string;
   orderId?: string;
+  invoiceUrl?: string; // optional: invoice PDF link
 }) {
-  const { title, price, eta, orderId } = params;
+  const { title, price, eta, orderId, invoiceUrl } = params;
+  const inv = normalizeUrl(invoiceUrl);
   const subject = `【Momentia】パネルご注文を受け付けました${orderId ? `（注文番号: ${orderId}）` : ""}`;
 
   const text = `この度はご注文ありがとうございます。
@@ -110,7 +124,7 @@ export function tplOrderPanelUser(params: {
 金額: ${fmtJPY(price)}
 出荷目安: ${eta}
 発送準備が整い次第、あらためてご連絡いたします。
-${brandFooterText}`;
+${inv ? `領収書PDF: ${inv}\n` : ""}${brandFooterText}`;
 
   const html = `
   <p>この度はご注文ありがとうございます。</p>
@@ -119,6 +133,7 @@ ${brandFooterText}`;
      <b>金額:</b> ${fmtJPY(price)}<br/>
      <b>出荷目安:</b> ${eta}</p>
   <p>発送準備が整い次第、あらためてご連絡いたします。</p>
+  ${inv ? `<p><a href="${inv}">領収書PDFはこちら</a></p>` : ""}
   ${brandFooterHtml}
   `;
   return { subject, text, html };
@@ -132,8 +147,10 @@ export function tplOrderAdminNotice(params: {
   email: string;
   amount: number;
   orderId?: string;
+  invoiceUrl?: string; // optional
 }) {
-  const { kind, title, slug, email, amount, orderId } = params;
+  const { kind, title, slug, email, amount, orderId, invoiceUrl } = params;
+  const inv = normalizeUrl(invoiceUrl);
   const subject = `【注文通知】${title} / ${kind} / ${fmtJPY(amount)}${orderId ? ` / #${orderId}` : ""}`;
 
   const text = `新規注文
@@ -142,7 +159,7 @@ export function tplOrderAdminNotice(params: {
 購入者: ${email}
 金額: ${fmtJPY(amount)}
 注文番号: ${orderId ?? "-"}
-${brandFooterText}`;
+${inv ? `Invoice URL: ${inv}\n` : ""}${brandFooterText}`;
 
   const html = `<p>新規注文がありました。</p>
   <ul>
@@ -152,6 +169,7 @@ ${brandFooterText}`;
     <li>注文番号: ${orderId ?? "-"}</li>
     <li>金額: ${fmtJPY(amount)}</li>
   </ul>
+  ${inv ? `<p>Invoice URL: <a href="${inv}">${inv}</a></p>` : ""}
   ${brandFooterHtml}`;
   return { subject, text, html };
 }

@@ -102,27 +102,44 @@ export default async function PurchaseSuccessPage({
         </div>
       )}
 
-      {/* デジタル商品のダウンロードリンク */}
-      {order?.itemType === "digital" && order?.downloadToken ? (
-        <div className="mt-6 rounded-xl border bg-neutral-50 p-4">
-          <h2 className="text-lg font-medium mb-2">デジタルデータのダウンロード</h2>
-          <p className="text-sm text-neutral-700 mb-3">
-            下のリンクからダウンロードできます。リンクは一定時間で無効になります。
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <a
-              href={`/api/download?token=${encodeURIComponent(order.downloadToken)}`}
-              className="inline-flex items-center rounded-xl bg-black text-white px-4 py-2 text-sm hover:opacity-90"
-            >
-              ダウンロードする
-            </a>
+      {/* デジタル商品のご案内（トークン有り／未発行の両対応） */}
+      {order?.itemType === "digital" ? (
+        order.downloadToken ? (
+          <div className="mt-6 rounded-xl border bg-neutral-50 p-4">
+            <h2 className="text-lg font-medium mb-2">デジタルデータのダウンロード</h2>
+            <p className="text-sm text-neutral-700 mb-3">
+              下のリンクからダウンロードできます。リンクは一定時間で無効になります。
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={`/api/download?token=${encodeURIComponent(order.downloadToken)}`}
+                className="inline-flex items-center rounded-xl bg-black text-white px-4 py-2 text-sm hover:opacity-90"
+              >
+                ダウンロードする
+              </a>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-6 rounded-xl border bg-amber-50 p-4">
+            <h2 className="text-lg font-medium mb-2">決済を受け付けました（処理中）</h2>
+            <p className="text-sm text-neutral-800">
+              ただいまダウンロード用リンクを準備しています。通常は数分以内に
+              <b>「【Momentia】デジタル画像のダウンロード方法」</b> という件名のメールが届きます。
+            </p>
+            <p className="text-xs text-neutral-600 mt-2">
+              ※ 10分以上メールが届かない場合は、お手数ですが{" "}
+              <a href="mailto:info@evoluzio.com" className="underline">
+                info@evoluzio.com
+              </a>{" "}
+             までご連絡ください。
+            </p>
+          </div>
+        )
       ) : null}
 
       <div className="grid gap-2 text-sm text-neutral-700 pt-4">
-        <p>・デジタル商品: 決済完了後にこの画面にダウンロードリンクが表示されます（メールでもお送りします）。</p>
-        <p>・パネル商品: ご入力いただいた住所に発送します。準備が整い次第、メールでご連絡します（送料込み、税込）。</p>
+        <p>・デジタル商品：ダウンロードリンクはこの画面に表示されるか、メールでお送りします（リンクは一定期間で失効）。</p>
+        <p>・パネル商品：ご入力いただいた住所に発送します。準備が整い次第、メールでご連絡します（送料込み、税込）。</p>
       </div>
 
       <div className="pt-2">
