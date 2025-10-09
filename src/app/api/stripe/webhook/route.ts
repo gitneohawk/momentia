@@ -64,37 +64,25 @@ export async function POST(req: Request) {
     // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
     const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
 
-    // 領収書（invoice）用 AccessToken を常に発行（デジタル/パネル共通）
-    const invoiceToken = await prisma.accessToken.create({
-      data: {
-        orderId: full.id,
-        kind: "invoice",
-        maxUses: 5,
-        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90日
-      },
-    });
-
-
-    // デジタル用 AccessToken を必要時のみ発行（IDは cuid）
-    let accessTokenId: string | null = null;
-    if (itemType === "digital") {
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7日
-      const at = await prisma.accessToken.create({
-        data: {
-          orderId: full.id,
-          kind: "digital",
-          maxUses: 3,
-          expiresAt,
-        },
-      });
-      accessTokenId = at.id;
-    }
-
-    // 3) DB 保存（upsert）
+    // 3) DB 保存（upsert）: まず Order を確定し、その DB の id を取得
+    let orderRecord: { id: string } | null = null;
     try {
-      await prisma.order.upsert({
+      orderRecord = await prisma.order.upsert({
         where: { sessionId: full.id },
-        update: {},
+        update: {
+          paymentIntentId:
+            typeof full.payment_intent === "string"
+              ? full.payment_intent
+              : full.payment_intent?.id ?? null,
+          itemType,
+          name,
+          slug,
+          email,
+          amountJpy,
+          currency: full.currency ?? "jpy",
+          shipping: shipping as any,
+          metadata: (full.metadata ?? {}) as any,
+        },
         create: {
           sessionId: full.id,
           paymentIntentId:
@@ -110,11 +98,14 @@ export async function POST(req: Request) {
           shipping: shipping as any,
           metadata: (full.metadata ?? {}) as any,
         },
+        select: { id: true },
       });
+
       console.info("[STRIPE_WEBHOOK_OK][DB_SAVED]", {
         orderId: full.id,
         itemType,
         slug,
+        dbId: orderRecord.id,
       });
     } catch (dbErr) {
       console.error("[ALERT][STRIPE_WEBHOOK_ERROR][DB_SAVE_FAILED]", {
@@ -123,26 +114,62 @@ export async function POST(req: Request) {
         slug,
         error: String(dbErr),
       });
-      console.error("[webhook] failed to save order", dbErr);
       return new NextResponse("DB Error", { status: 500 });
     }
 
+    // 4) AccessToken 発行（Order の DB id にひも付ける）
+    let invoiceTokenId: string | null = null;
+    let accessTokenId: string | null = null;
+    try {
+      // 領収書（共通）
+      const inv = await prisma.accessToken.create({
+        data: {
+          orderId: orderRecord!.id,
+          kind: "invoice",
+          maxUses: 5,
+          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90日
+        },
+        select: { id: true },
+      });
+      invoiceTokenId = inv.id;
+
+      // デジタル（必要時）
+      if (itemType === "digital") {
+        const at = await prisma.accessToken.create({
+          data: {
+            orderId: orderRecord!.id,
+            kind: "digital",
+            maxUses: 3,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7日
+          },
+          select: { id: true },
+        });
+        accessTokenId = at.id;
+      }
+    } catch (tokErr) {
+      console.error("[ALERT][STRIPE_WEBHOOK_ERROR][TOKEN_CREATE_FAILED]", {
+        orderId: full.id,
+        error: String(tokErr),
+      });
+      // トークン発行失敗でも、後続（管理通知など）は進める
+    }
+
+    // 5) メール送信用の URL を準備
+    const baseUrl =
+      (process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ||
+        (process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : ""));
+    const _invoiceUrl =
+      invoiceTokenId && baseUrl ? `${baseUrl}/api/invoice?token=${invoiceTokenId}` : "";
+    const _downloadUrl =
+      accessTokenId && baseUrl ? `${baseUrl}/api/download?token=${accessTokenId}` : "";
+
     // 4) メール送信（失敗しても 200 を返す。Stripe 側で重複送信されるため冪等に注意）
     try {
-      const baseUrl =
-        (process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ||
-          (process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : ""));
-      // 上で作成した invoiceUrl を、このスコープの baseUrl で再計算（念のため）
-      const _invoiceUrl = (typeof invoiceToken !== "undefined" && invoiceToken?.id && baseUrl)
-        ? `${baseUrl}/api/invoice?token=${invoiceToken.id}`
-        : "";
-
       const adminTo = process.env.ADMIN_NOTICE_TO || process.env.MAIL_FROM || "";
 
       if (itemType === "digital" && email) {
         // 購入者向け（ダウンロード）
-        const downloadUrl =
-          accessTokenId && baseUrl ? `${baseUrl}/api/download?token=${accessTokenId}` : "";
+        const downloadUrl = _downloadUrl;
 
         const mail = tplOrderDigitalUser({
           title: name ?? "(no title)",
