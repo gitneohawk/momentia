@@ -130,6 +130,10 @@ model Order {
   downloadToken   String?                         
   metadata        Json?                         // Checkout Session の metadata
 
+  // --- Mail send guards (prevent duplicate emails on webhook retry) ---
+  emailedUserAt   DateTime?   // 購入者メール送信日時（再送防止）
+  emailedAdminAt  DateTime?   // 運営通知メール送信日時（再送防止）
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt 
 

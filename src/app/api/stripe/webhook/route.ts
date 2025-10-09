@@ -117,34 +117,56 @@ export async function POST(req: Request) {
       return new NextResponse("DB Error", { status: 500 });
     }
 
-    // 4) AccessToken 発行（Order の DB id にひも付ける）
+    // 4) AccessToken 発行（Order の DB id にひも付ける）—既存があれば再利用
     let invoiceTokenId: string | null = null;
     let accessTokenId: string | null = null;
     try {
-      // 領収書（共通）
-      const inv = await prisma.accessToken.create({
-        data: {
-          orderId: orderRecord!.id,
-          kind: "invoice",
-          maxUses: 5,
-          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90日
-        },
-        select: { id: true },
-      });
-      invoiceTokenId = inv.id;
+      // 既存の invoice/digital を検索
+      const [existingInvoice, existingDigital] = await Promise.all([
+        prisma.accessToken.findFirst({
+          where: { orderId: orderRecord!.id, kind: "invoice", revoked: false },
+          select: { id: true },
+        }),
+        itemType === "digital"
+          ? prisma.accessToken.findFirst({
+              where: { orderId: orderRecord!.id, kind: "digital", revoked: false },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+      ]);
 
-      // デジタル（必要時）
-      if (itemType === "digital") {
-        const at = await prisma.accessToken.create({
+      // 領収書（共通）
+      if (existingInvoice) {
+        invoiceTokenId = existingInvoice.id;
+      } else {
+        const inv = await prisma.accessToken.create({
           data: {
             orderId: orderRecord!.id,
-            kind: "digital",
-            maxUses: 3,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7日
+            kind: "invoice",
+            maxUses: 5,
+            expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90日
           },
           select: { id: true },
         });
-        accessTokenId = at.id;
+        invoiceTokenId = inv.id;
+      }
+
+      // デジタル（必要時）
+      if (itemType === "digital") {
+        if (existingDigital) {
+          accessTokenId = existingDigital.id;
+        } else {
+          const at = await prisma.accessToken.create({
+            data: {
+              orderId: orderRecord!.id,
+              kind: "digital",
+              maxUses: 3,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7日
+            },
+            select: { id: true },
+          });
+          accessTokenId = at.id;
+        }
       }
     } catch (tokErr) {
       console.error("[ALERT][STRIPE_WEBHOOK_ERROR][TOKEN_CREATE_FAILED]", {
