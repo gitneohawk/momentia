@@ -2,7 +2,6 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { PrismaClient } from "@prisma/client";
-import crypto from "crypto";
 import { sendMail } from "@/lib/mailer";
 import { tplOrderDigitalUser, tplOrderPanelUser, tplOrderAdminNotice } from "@/lib/mail-templates";
 
@@ -65,10 +64,30 @@ export async function POST(req: Request) {
     // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
     const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
 
-    // デジタル用ダウンロードトークン（必要時のみ発行）
-    let downloadToken: string | null = null;
+    // 領収書（invoice）用 AccessToken を常に発行（デジタル/パネル共通）
+    const invoiceToken = await prisma.accessToken.create({
+      data: {
+        orderId: full.id,
+        kind: "invoice",
+        maxUses: 5,
+        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90日
+      },
+    });
+
+
+    // デジタル用 AccessToken を必要時のみ発行（IDは cuid）
+    let accessTokenId: string | null = null;
     if (itemType === "digital") {
-      downloadToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7日
+      const at = await prisma.accessToken.create({
+        data: {
+          orderId: full.id,
+          kind: "digital",
+          maxUses: 3,
+          expiresAt,
+        },
+      });
+      accessTokenId = at.id;
     }
 
     // 3) DB 保存（upsert）
@@ -90,7 +109,6 @@ export async function POST(req: Request) {
           currency: full.currency ?? "jpy",
           shipping: shipping as any,
           metadata: (full.metadata ?? {}) as any,
-          downloadToken,
         },
       });
       console.info("[STRIPE_WEBHOOK_OK][DB_SAVED]", {
@@ -114,12 +132,17 @@ export async function POST(req: Request) {
       const baseUrl =
         (process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ||
           (process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : ""));
+      // 上で作成した invoiceUrl を、このスコープの baseUrl で再計算（念のため）
+      const _invoiceUrl = (typeof invoiceToken !== "undefined" && invoiceToken?.id && baseUrl)
+        ? `${baseUrl}/api/invoice?token=${invoiceToken.id}`
+        : "";
+
       const adminTo = process.env.ADMIN_NOTICE_TO || process.env.MAIL_FROM || "";
 
       if (itemType === "digital" && email) {
         // 購入者向け（ダウンロード）
         const downloadUrl =
-          downloadToken && baseUrl ? `${baseUrl}/api/download?token=${downloadToken}` : "";
+          accessTokenId && baseUrl ? `${baseUrl}/api/download?token=${accessTokenId}` : "";
 
         const mail = tplOrderDigitalUser({
           title: name ?? "(no title)",
@@ -139,7 +162,15 @@ export async function POST(req: Request) {
           orderId: full.id,
           itemType,
           to: email,
+          accessTokenId,
         });
+
+        if (_invoiceUrl) {
+          console.info("[STRIPE_WEBHOOK_INFO][INVOICE_URL_ATTACHED]", {
+            orderId: full.id,
+            invoiceUrl: _invoiceUrl,
+          });
+        }
 
         // 管理者通知
         if (adminTo) {
@@ -161,6 +192,7 @@ export async function POST(req: Request) {
             orderId: full.id,
             itemType,
             to: adminTo,
+            invoiceUrl: _invoiceUrl,
           });
         }
       } else if (itemType === "panel" && email) {
@@ -186,6 +218,13 @@ export async function POST(req: Request) {
           to: email,
         });
 
+        if (_invoiceUrl) {
+          console.info("[STRIPE_WEBHOOK_INFO][INVOICE_URL_ATTACHED]", {
+            orderId: full.id,
+            invoiceUrl: _invoiceUrl,
+          });
+        }
+
         // 管理者通知
         if (adminTo) {
           const adminMail = tplOrderAdminNotice({
@@ -206,6 +245,7 @@ export async function POST(req: Request) {
             orderId: full.id,
             itemType,
             to: adminTo,
+            invoiceUrl: _invoiceUrl,
           });
         }
       }

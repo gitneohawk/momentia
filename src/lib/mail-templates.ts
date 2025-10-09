@@ -1,6 +1,11 @@
+
 // Centralized e-mail templates for Momentia
 // Note: headers like from/reply-to are set by the sender (mailer.ts / API).
 // These templates only return subject/text/html bodies.
+
+// Configurable brand constants (pick from env with safe fallbacks)
+const SITE_URL = (process.env.NEXT_PUBLIC_BASE_URL ?? "https://momentia.evoluzio.com").replace(/\/+$/,"");
+const CONTACT_EMAIL = process.env.MAIL_REPLY_TO ?? "info@evoluzio.com";
 
 const fmtJPY = (n: number) =>
   new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(n);
@@ -8,24 +13,24 @@ const fmtJPY = (n: number) =>
 const brandFooterText =
 `---
 Momentia（Evoluzio Inc.）
-Web: https://momentia.evoluzio.com/
-お問合せ: info@evoluzio.com
-※このメールに返信すると運営宛て（info@evoluzio.com）に届きます。`;
+Web: ${SITE_URL}
+お問合せ: ${CONTACT_EMAIL}
+※このメールに返信すると運営宛て（${CONTACT_EMAIL}）に届きます。`;
 
 const brandFooterHtml = `
 <hr/>
 <p style="margin:8px 0 0 0;font-size:12px;color:#666">
   Momentia（Evoluzio Inc.）<br/>
-  Web: <a href="https://momentia.evoluzio.com/">https://momentia.evoluzio.com/</a><br/>
-  お問合せ: <a href="mailto:info@evoluzio.com">info@evoluzio.com</a><br/>
-  <span>※このメールに返信すると運営宛て（info@evoluzio.com）に届きます。</span>
+  Web: <a href="${SITE_URL}">${SITE_URL}</a><br/>
+  お問合せ: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a><br/>
+  <span>※このメールに返信すると運営宛て（${CONTACT_EMAIL}）に届きます。</span>
 </p>
 `;
 
 // Ensure the download URL is the canonical query form: /api/download?token=...
 // Accepts full URL, path-based token (/api/download/<token>), raw token, or already-canonical query string.
 function buildDownloadUrl(input: string): string {
-  const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? "").replace(/\/+$/,"");
+  const BASE = SITE_URL;
   const s = (input ?? "").trim();
   if (!s) return `${BASE}/api/download`; // fallback (unlikely)
 

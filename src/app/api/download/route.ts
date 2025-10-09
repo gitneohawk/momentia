@@ -32,6 +32,52 @@ function getStorageCreds() {
   return { accountName, accountKey };
 }
 
+/**
+ * Resolve download target by token.
+ * 1) New path: AccessToken(id) → Order (kind=digital, not revoked/expired, within usage)
+ * 2) Legacy fallback: Order.downloadToken
+ */
+async function resolveDigitalOrderByToken(token: string) {
+  // Try AccessToken path first
+  const at = await prisma.accessToken.findUnique({
+    where: { id: token },
+    include: { order: { select: { id: true, slug: true, itemType: true } } },
+  }).catch(() => null);
+
+  if (at?.order) {
+    const now = new Date();
+    const validKind = at.kind === "digital";
+    const notRevoked = !at.revoked;
+    const notExpired = !at.expiresAt || at.expiresAt > now;
+    const withinUsage =
+      (at.maxUses ?? 1) === 0 // 0 means unlimited
+        ? true
+        : (at.used ?? 0) < (at.maxUses ?? 1);
+
+    if (validKind && notRevoked && notExpired && withinUsage) {
+      return {
+        order: at.order,
+        accessTokenId: at.id,
+        shouldCountUse: true,
+      } as const;
+    }
+    // Token exists but invalid
+    return { order: null, accessTokenId: at.id, shouldCountUse: false } as const;
+  }
+
+  // Legacy fallback: Order.downloadToken
+  const legacy = await prisma.order.findFirst({
+    where: { downloadToken: token },
+    select: { id: true, slug: true, itemType: true },
+  }).catch(() => null);
+
+  if (legacy) {
+    return { order: legacy, accessTokenId: null, shouldCountUse: false } as const;
+  }
+
+  return { order: null, accessTokenId: null, shouldCountUse: false } as const;
+}
+
 // GET /api/download?token=xxxx[&size=2048]
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -42,15 +88,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "トークンが指定されていません。" }, { status: 400 });
   }
 
-  // 注文をトークンで検索
-  const order = await prisma.order.findFirst({
-    where: { downloadToken: token },
-    select: { id: true, slug: true, itemType: true },
-  });
+  // Resolve order (AccessToken → legacy fallback)
+  const resolved = await resolveDigitalOrderByToken(token);
 
-  if (!order) {
+  if (!resolved.order) {
     return NextResponse.json({ error: "無効または期限切れのトークンです。" }, { status: 404 });
   }
+
+  const order = resolved.order;
 
   if (order.itemType !== "digital") {
     return NextResponse.json({ error: "デジタル商品のみダウンロード可能です。" }, { status: 403 });
@@ -62,7 +107,7 @@ export async function GET(req: NextRequest) {
 
   const { accountName, accountKey } = getStorageCreds();
   const containerName = process.env.AZURE_STORAGE_CONTAINER || "photos";
-  const basePath = process.env.AZURE_BLOB_BASE_PATH || "public"; // screenshot shows photos/public/xxx
+  const basePath = process.env.AZURE_BLOB_BASE_PATH || "public"; // e.g. photos/public/xxx
   const suffix = process.env.DOWNLOAD_SUFFIX || `_${size}`; // e.g. _2048
 
   // 例: public/tulips_2048.jpg
@@ -77,6 +122,7 @@ export async function GET(req: NextRequest) {
     basePath,
     suffix,
     blobName,
+    via: resolved.accessTokenId ? "accessToken" : "legacy",
   });
 
   if (!accountName || !accountKey) {
@@ -108,6 +154,19 @@ export async function GET(req: NextRequest) {
     const blobUrl = `https://${accountName}.blob.core.windows.net/${containerName}/${encodeURI(
       blobName,
     )}?${sasToken}`;
+
+    // 使用回数カウント（AccessToken経由のときのみ）
+    if (resolved.accessTokenId && resolved.shouldCountUse) {
+      try {
+        await prisma.accessToken.update({
+          where: { id: resolved.accessTokenId },
+          data: { used: { increment: 1 } },
+        });
+      } catch (e) {
+        // カウント失敗はダウンロード自体を妨げない（ログのみ）
+        console.error("[download] failed to increment usedCount", e);
+      }
+    }
 
     return NextResponse.redirect(blobUrl);
   } catch (e) {

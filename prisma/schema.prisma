@@ -135,8 +135,47 @@ model Order {
 
   status OrderStatus @default(paid)
 
+  // --- Invoice / Billing (optional fields set by buyer) ---
+  companyName       String?    // 宛名（会社名）
+  department        String?    // 部署
+  personName        String?    // 担当者名
+  phone             String?    // 連絡先（任意）
+
+  // --- Invoice lifecycle ---
+  invoiceVersion       Int       @default(1)      // 再発行時に +1
+  invoiceRevoked       Boolean   @default(false)  // 返金等で失効
+  refundNoteIssuedAt   DateTime?                  // 返金伝票の発行日時
+
+  // --- Relations ---
+  tokens            AccessToken[]
+
   @@index([slug])
   @@index([email])
+}
+
+// アクセストークン種別（拡張しやすいように enum）
+enum AccessTokenKind {
+  digital       // デジタル画像ダウンロード
+  invoice       // 領収書PDFダウンロード
+  credit_note   // 返金伝票(PDF)ダウンロード
+}
+
+// ダウンロード/閲覧用のアクセストークン（回数・期限・失効を管理）
+model AccessToken {
+  id         String           @id @default(cuid())
+  orderId    String
+  kind       AccessTokenKind
+  maxUses    Int              @default(1)
+  used       Int              @default(0)
+  expiresAt  DateTime?
+  revoked    Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  order      Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([kind])
+  @@index([expiresAt])
 }
 
 enum OrderStatus {
