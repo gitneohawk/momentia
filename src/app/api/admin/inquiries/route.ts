@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { isAdminEmail } from "@/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // 管理API: /api/admin/inquiries
 // NOTE: /admin 配下は Entra ID で保護されている前提です。必要に応じてここでも追加の認可チェックを入れてください。
@@ -11,6 +14,12 @@ const patchSchema = z.object({
 });
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email ?? "";
+  if (!email || !isAdminEmail(email)) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const items = await prisma.inquiry.findMany({
       orderBy: { createdAt: "desc" },
@@ -35,6 +44,12 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email ?? "";
+  if (!email || !isAdminEmail(email)) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const json = await req.json();
     const { id, status } = patchSchema.parse(json);

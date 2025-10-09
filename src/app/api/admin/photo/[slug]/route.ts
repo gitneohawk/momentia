@@ -1,3 +1,22 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { BlobServiceClient } from "@azure/storage-blob";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/auth";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const CONTAINER_NAME = "photos";
+
+async function getContainer() {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) throw new Error("missing storage connection");
+  const service = BlobServiceClient.fromConnectionString(conn);
+  return service.getContainerClient(CONTAINER_NAME);
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ slug: string }> }
@@ -5,6 +24,10 @@ export async function GET(
   const session = await getServerSession(authOptions);
   if (!session) {
     return new NextResponse("Unauthorized", { status: 401 });
+  }
+  const email = session.user?.email ?? "";
+  if (!isAdminEmail(email)) {
+    return new NextResponse("Forbidden", { status: 403 });
   }
   try {
     const { slug } = await params;
@@ -19,23 +42,6 @@ export async function GET(
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { BlobServiceClient } from "@azure/storage-blob";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-const CONTAINER_NAME = "photos";
-
-async function getContainer() {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("missing storage connection");
-  const service = BlobServiceClient.fromConnectionString(conn);
-  return service.getContainerClient(CONTAINER_NAME);
-}
 
 export async function PATCH(
   req: Request,
@@ -44,6 +50,10 @@ export async function PATCH(
   const session = await getServerSession(authOptions);
   if (!session) {
     return new NextResponse("Unauthorized", { status: 401 });
+  }
+  const email = session.user?.email ?? "";
+  if (!isAdminEmail(email)) {
+    return new NextResponse("Forbidden", { status: 403 });
   }
   try {
     const { slug } = await params;
@@ -139,6 +149,10 @@ export async function DELETE(
   const session = await getServerSession(authOptions);
   if (!session) {
     return new NextResponse("Unauthorized", { status: 401 });
+  }
+  const email = session.user?.email ?? "";
+  if (!isAdminEmail(email)) {
+    return new NextResponse("Forbidden", { status: 403 });
   }
   try {
     const { slug } = await params;

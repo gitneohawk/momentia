@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { PrismaClient, OrderStatus } from "@prisma/client";
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/auth";
+
 export const runtime = "nodejs";
 
 const prisma = new PrismaClient();
@@ -10,6 +14,12 @@ export async function PUT(
   context: { params: Promise<{ sessionId: string }> }
 ) {
   const p = await context.params;
+  // RBAC: admin only (based on isAdminEmail)
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!isAdminEmail(email)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const raw = String(body?.status ?? "").toLowerCase();

@@ -17,18 +17,19 @@ export const metadata = {
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import AdminLogoutButton from "@/components/AdminLogoutButton";
+import { authOptions, isAdminEmail } from "@/lib/auth";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
 
   // 未ログイン: サインインへ
   if (!session) {
     redirect("/api/auth/signin?callbackUrl=/admin");
   }
 
-  // 権限チェック: evoluzio.com ドメインのユーザーのみ許可
+  // 権限チェック: 管理者メールかどうか（RBAC移行までの暫定）
   const email = session.user?.email ?? "";
-  const isAdmin = email.endsWith("@evoluzio.com");
+  const isAdmin = isAdminEmail(email);
   if (!isAdmin) {
     redirect("/");
   }

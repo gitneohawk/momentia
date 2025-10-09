@@ -6,14 +6,14 @@ function extractFirstImageKey(mdx: string): string | null {
   return null;
 }
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminEmail } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 async function assertAdmin() {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? "";
-  return email.endsWith("@evoluzio.com");
+  return isAdminEmail(email);
 }
 
 // GET /api/admin/blog/[slug]

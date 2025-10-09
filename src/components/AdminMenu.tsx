@@ -1,3 +1,4 @@
+import { isAdminEmail } from "@/lib/auth";
 // Server Component
 import Link from "next/link";
 import { getServerSession } from "next-auth";
@@ -8,8 +9,7 @@ export default async function AdminMenu() {
 
   // 管理者チェック: evoluzio.com ドメインのユーザーだけ
   const email = session.user?.email ?? "";
-  const isAdmin = email.endsWith("@evoluzio.com");
-  if (!isAdmin) return null;
+  if (!isAdminEmail(email)) return null;
 
   return (
     <nav className="flex items-center gap-3">

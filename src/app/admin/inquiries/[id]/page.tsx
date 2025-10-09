@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { isAdminEmail } from "@/lib/auth";
 
 function fmt(dt: Date) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -19,8 +20,7 @@ export default async function InquiryDetail({
   const { id } = await params;
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? "";
-  const isAdmin = email.endsWith("@evoluzio.com");
-  if (!isAdmin) redirect("/");
+  if (!isAdminEmail(email)) redirect("/");
 
   const inquiry = await prisma.inquiry.findUnique({
     where: { id },

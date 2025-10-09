@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminEmail } from "@/lib/auth";
 import type { Prisma } from "@prisma/client";
 import {
   BlobServiceClient,
@@ -110,8 +110,12 @@ async function getSignedUrl(storagePath: string, ttlMinutes = 60): Promise<strin
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session) {
+  const email = session?.user?.email;
+  if (!email) {
     return new NextResponse("Unauthorized", { status: 401 });
+  }
+  if (!isAdminEmail(email)) {
+    return new NextResponse("Forbidden", { status: 403 });
   }
   try {
     const photos = (await prisma.photo.findMany({

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminEmail } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 async function assertAdmin() {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? "";
-  return email.endsWith("@evoluzio.com");
+  return isAdminEmail(email);
 }
 
 // GET /api/admin/blog  -> list posts (optionally filter)
