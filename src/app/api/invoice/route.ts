@@ -1,5 +1,3 @@
-
-
 // src/app/api/invoice/route.ts
 // Invoice delivery by token (HTML; can be swapped to PDF later)
 // Accepts: GET /api/invoice?token=...
@@ -15,7 +13,6 @@ const COMPANY = {
   name: "株式会社エヴォルツィオ",
   addr1: "東京都渋谷区恵比寿4-20-3",
   addr2: "恵比寿ガーデンプレイスタワー 18階",
-  rep: "代表取締役  高橋伸和",
   invNo: "T2-0110-0107-3296",
 };
 
@@ -26,6 +23,8 @@ function bad(status: number, msg: string) {
 function renderHtml(params: { orderId: string; issuedAt: Date }) {
   const { orderId, issuedAt } = params;
   const issued = issuedAt.toISOString().slice(0, 10);
+  const paymentMethod = "クレジットカード（Stripe 決済）"; // TODO: 決済種別に応じて将来可変に
+
   return `<!doctype html>
 <html lang="ja">
 <head>
@@ -34,22 +33,25 @@ function renderHtml(params: { orderId: string; issuedAt: Date }) {
 <title>領収書 / Receipt - Momentia</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;margin:24px;color:#111}
-  .box{max-width:720px;margin:0 auto;border:1px solid #ddd;padding:24px;border-radius:8px}
-  h1{font-size:20px;margin:0 0 12px 0}
+  .box{max-width:720px;margin:0 auto;border:1px solid #ddd;padding:24px;border-radius:8px;position:relative}
+  h1{font-size:20px;margin:0 0 8px 0}
   .muted{color:#666;font-size:12px}
   table{width:100%;border-collapse:collapse;margin-top:12px}
-  th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
-  .right{text-align:right}
+  th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+  .seal{position:absolute;right:24px;top:24px;width:120px;height:auto;opacity:.95}
 </style>
 </head>
 <body>
   <div class="box">
-    <h1>領収書（控） / Receipt</h1>
+    <img src="/EvoluzioStamp.png" alt="会社印" class="seal" />
+    <h1>領収書 / Receipt</h1>
     <div class="muted">発行日: ${issued}</div>
+    <div class="muted">領収書番号: ${orderId}</div>
 
     <table>
       <tr><th>注文番号</th><td>${orderId}</td></tr>
       <tr><th>但し書き</th><td>写真作品代として</td></tr>
+      <tr><th>お支払方法</th><td>${paymentMethod}</td></tr>
       <tr><th>備考</th><td>この領収書は電子的に発行されています。</td></tr>
     </table>
 
@@ -57,11 +59,10 @@ function renderHtml(params: { orderId: string; issuedAt: Date }) {
     <table>
       <tr><th>名称</th><td>${COMPANY.name}</td></tr>
       <tr><th>所在地</th><td>${COMPANY.addr1}<br/>${COMPANY.addr2}</td></tr>
-      <tr><th>代表者</th><td>${COMPANY.rep}</td></tr>
       <tr><th>適格請求書発行事業者登録番号</th><td>${COMPANY.invNo}</td></tr>
     </table>
 
-    <p class="muted" style="margin-top:16px">※ 金額・品目等の詳細は注文確認メールまたはご購入履歴をご確認ください。</p>
+    <p class="muted" style="margin-top:16px">※ 金額・品目等の詳細は注文確認メールをご確認ください。</p>
   </div>
 </body>
 </html>`;
