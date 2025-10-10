@@ -89,7 +89,7 @@ export default async function PurchaseSuccessPage({
               {order.itemType === "panel" ? "（送料込み、税込）" : "（税込）"}
             </div>
 
-            <div className="text-neutral-500">Slug</div>
+            <div className="text-neutral-500">商品</div>
             <div>{order.slug ?? "-"}</div>
 
             <div className="text-neutral-500">ステータス</div>

@@ -1,7 +1,24 @@
+// サーバ由来のオリジン判定ヘルパ
+function getRequestOrigin(req: Request) {
+  try {
+    return new URL(req.url).origin; // 例: http://localhost:3000
+  } catch {
+    const h = new Headers(req.headers);
+    const host = h.get("x-forwarded-host") || h.get("host") || "";
+    if (!host) return null;
+    // ローカルは http 前提 / 本番は https（最低限のフォールバック）
+    const isLocal = /(^localhost(:\d+)?$)|(^127\.0\.0\.1$)/i.test(host);
+    const proto = isLocal ? "http" : "https";
+    return `${proto}://${host}`;
+  }
+}
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
+
+import { getServerSession } from "next-auth";
+import { authOptions, isAdminSession } from "@/lib/auth";
 
 import sharp from "sharp";
 import * as exifr from "exifr";
@@ -106,6 +123,10 @@ function slugify(input: string): string {
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!isAdminSession(session)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
     const form = await req.formData();
     const file = form.get("file");
     if (!file || typeof file === "string") {
@@ -200,7 +221,22 @@ export async function POST(req: Request) {
       await prisma.keyword.createMany({ data: kws.slice(0, 16).map((word) => ({ photoId: photo.id, word })) });
     }
 
-    return NextResponse.json({ ok: true, slug });
+    // --- 透かし（WM）の事前生成（失敗しても非致命） ---
+    let wmGenerated = false;
+    try {
+      const origin = getRequestOrigin(req) || process.env.NEXT_PUBLIC_SITE_URL;
+      if (origin) {
+        const resp = await fetch(
+          `${origin}/api/wm/${encodeURIComponent(slug)}?generate=1&debug=1`,
+          { cache: "no-store", redirect: "manual" as any }
+        );
+        wmGenerated = resp.status >= 200 && resp.status < 400;
+      }
+    } catch (wmErr: any) {
+      console.warn("[upload] wm pre-generation failed:", String(wmErr?.message || wmErr));
+    }
+
+    return NextResponse.json({ ok: true, slug, wmGenerated });
   } catch (e: any) {
     console.error(e);
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });

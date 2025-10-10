@@ -1,5 +1,5 @@
 // src/app/api/wm/[slug]/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BlobServiceClient } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
@@ -16,6 +16,11 @@ const QUALITY = 85;          // 出力JPEG品質
 const _MARGIN = 24;           // 端からの余白(px)
 const WM_TEXT = "© Evoluzio Inc. — Preview"; // 透かし文言
 const _WM_PLACEMENT: "center" | "bottom-right" = "center";
+
+const WM_CONTAINER = "wm"; // 透かし済み画像を保存する専用コンテナ
+const WM_MAX_EDGE = 2048;  // 透かし出力の長辺
+const WM_VERSION = "v1";   // 将来の画質・レイアウト変更時のキャッシュ破棄用
+const FORCE_QUERY_KEY = "generate"; // /api/wm/[slug]?generate=1 で強制生成
 
 function svgWatermark(text: string, imgWidth: number) {
   // 半透明の白文字＋わずかな影（視認性重視）
@@ -43,7 +48,7 @@ function svgWatermark(text: string, imgWidth: number) {
 }
 
 
-function getContainerClient(log?: (...args: any[]) => void) {
+function getContainerClient(containerName: string, log?: (...args: any[]) => void) {
   const account =
     process.env.AZURE_STORAGE_ACCOUNT ||
     process.env.STORAGE_ACCOUNT_NAME ||
@@ -65,7 +70,7 @@ function getContainerClient(log?: (...args: any[]) => void) {
     const url = `https://${account}.blob.core.windows.net`;
     const credential = new DefaultAzureCredential();
     const service = new BlobServiceClient(url, credential);
-    return service.getContainerClient(CONTAINER);
+    return service.getContainerClient(containerName);
   }
 
   if (conn) {
@@ -74,7 +79,7 @@ function getContainerClient(log?: (...args: any[]) => void) {
     const acctMatch = conn.match(/AccountName=([^;]+)/i);
     log?.("auth", { mode: "conn-string", account: acctMatch?.[1] ?? undefined });
     const service = BlobServiceClient.fromConnectionString(conn);
-    return service.getContainerClient(CONTAINER);
+    return service.getContainerClient(containerName);
   }
 
   // If we reach here, we don't have enough info
@@ -90,9 +95,10 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ slug: string }> }
+  _req: NextRequest,
+  ctx: any
 ) {
+  const { params } = ctx as { params: { slug: string } };
   // Parse debug flag from query string
   const url = new URL(_req.url);
   const debug = url.searchParams.get(DEBUG_QUERY_KEY) === "1" || url.searchParams.get(DEBUG_QUERY_KEY) === "true";
@@ -107,10 +113,34 @@ export async function GET(
   log("request start", { url: url.pathname + url.search });
 
   try {
-    const { slug } = await ctx.params;
+    const { slug } = params;
 
     log("slug", slug);
 
+    const forceGenerate = url.searchParams.get(FORCE_QUERY_KEY) === "1" || url.searchParams.get(FORCE_QUERY_KEY) === "true";
+    const wmFileName = `${slug}_wm_${WM_MAX_EDGE}_${WM_VERSION}.jpg`;
+    const wmPath = `/${wmFileName}`.replace(/^\/+/, ""); // フラット配置（必要なら階層化に変更可）
+
+    const account =
+      process.env.AZURE_STORAGE_ACCOUNT ||
+      process.env.STORAGE_ACCOUNT_NAME ||
+      process.env.NEXT_PUBLIC_STORAGE_ACCOUNT ||
+      "";
+    if (!account) throw new Error("Missing storage account name for public URL computation");
+
+    // Prefer explicit override for local/dev (e.g., Azurite): AZURE_BLOB_PUBLIC_BASE
+    // Example: http://localhost:10000/devstoreaccount1
+    const envPublicBase = process.env.AZURE_BLOB_PUBLIC_BASE?.trim();
+    let publicBase = envPublicBase && envPublicBase.length > 0 ? envPublicBase : `https://${account}.blob.core.windows.net`;
+
+    // If using Azurite (devstoreaccount1 or UseDevelopmentStorage), fall back to a sane default if not explicitly set
+    const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING || "";
+    const isDevstore = account === "devstoreaccount1" || /UseDevelopmentStorage=true/i.test(connStr) || /AccountName=devstoreaccount1/i.test(connStr);
+    if (!envPublicBase && isDevstore) {
+      const host = process.env.AZURITE_PUBLIC_HOST || "localhost"; // set AZURITE_PUBLIC_HOST to your mapped host if not localhost
+      const port = process.env.AZURITE_BLOB_PUBLIC_PORT || "10000";
+      publicBase = `http://${host}:${port}/${account}`;
+    }
 
     // DB から対象写真と large 版のパスを取る
     const photo = await prisma.photo.findUnique({
@@ -124,38 +154,62 @@ export async function GET(
     const sourcePath = (large?.storagePath ?? photo.storagePath); // large 無ければオリジナル
     log("sourcePath", sourcePath, "chosenVariant", large ? "large" : "original");
 
-    const container = getContainerClient(log);
+    const wmContainer = getContainerClient(WM_CONTAINER, log);
+    try {
+      await wmContainer.createIfNotExists();
+    } catch (e) {
+      log("wm container createIfNotExists error (non-fatal)", String((e as any)?.message || e));
+    }
+    const wmBlob = wmContainer.getBlockBlobClient(wmPath);
+    let exists = false;
+    try {
+      exists = await wmBlob.exists();
+    } catch (ex: any) {
+      // Azurite may respond 400 OutOfRangeInput for HEAD on non-existing container/blob
+      log("wm exists() error treated as not-exists", String(ex?.message || ex));
+      exists = false;
+    }
+    log("wm exists?", exists, { container: WM_CONTAINER, path: wmPath });
+
+    if (exists && !forceGenerate) {
+      const target = `${publicBase}/${WM_CONTAINER}/${wmPath}`;
+      log("redirecting to existing WM", target);
+      return NextResponse.redirect(target, { status: 302 });
+    }
+
+    const container = getContainerClient(CONTAINER, log);
     const blobClient = container.getBlockBlobClient(sourcePath);
     log("downloading", { blob: sourcePath });
     const dl = await blobClient.download();
-    const input = await streamToBuffer(dl.readableStreamBody!);
+    if (!dl.readableStreamBody) throw new Error("Blob stream is empty");
+    const input = await streamToBuffer(dl.readableStreamBody);
     log("blob downloaded", { contentLength: dl.contentLength, bufLen: input.length });
 
-    // 画像を読み、回転補正＋透かし合成＋再圧縮
-    const img = sharp(input).rotate();
+    // 画像を読み、回転補正＋リサイズ＋透かし合成＋再圧縮
+    const img = sharp(input).rotate().resize({ width: WM_MAX_EDGE, height: WM_MAX_EDGE, fit: "inside", withoutEnlargement: true });
     const meta = await img.metadata();
     log("image metadata (pre)", { width: meta.width, height: meta.height, format: meta.format, hasProfile: Boolean(meta.icc) });
     const { width = 0, height = 0 } = meta;
     const { svgBuffer: wm, svgWidth: wmWidth, svgHeight: wmHeight } = svgWatermark(WM_TEXT, width || 0);
     log("wm computed", { text: WM_TEXT, wmWidth, wmHeight });
 
-// 透かしの配置：センター or 右下
-let left: number, top: number;
+    // 透かしの配置：センター or 右下
+    let left: number, top: number;
 
-if (_WM_PLACEMENT === "center") {
-  // 画像中心に配置（はみ出し防止で 0 を下限）
-  left = Math.max(0, Math.round(((width || 0) - wmWidth) / 2));
-  top  = Math.max(0, Math.round(((height || 0) - wmHeight) / 2));
-} else {
-  // 右下にマージンを取って配置
-  left = Math.max(0, (width || 0) - wmWidth - _MARGIN);
-  top  = Math.max(0, (height || 0) - wmHeight - _MARGIN);
-}
+    if (_WM_PLACEMENT === "center") {
+      // 画像中心に配置（はみ出し防止で 0 を下限）
+      left = Math.max(0, Math.round(((width || 0) - wmWidth) / 2));
+      top  = Math.max(0, Math.round(((height || 0) - wmHeight) / 2));
+    } else {
+      // 右下にマージンを取って配置
+      left = Math.max(0, (width || 0) - wmWidth - _MARGIN);
+      top  = Math.max(0, (height || 0) - wmHeight - _MARGIN);
+    }
 
-log("placement", {
-  mode: _WM_PLACEMENT,
-  width, height, left, top, margin: _MARGIN
-});
+    log("placement", {
+      mode: _WM_PLACEMENT,
+      width, height, left, top, margin: _MARGIN
+    });
 
     const composed = await img
       .composite([
@@ -176,16 +230,37 @@ log("placement", {
       composed.byteLength
     );
 
-    log("responding image/jpeg");
+    // 生成結果をWMコンテナへアップロード（冪等）
+    try {
+      await wmBlob.uploadData(u8, {
+        blobHTTPHeaders: {
+          blobContentType: "image/jpeg",
+          // ブラウザ・CDNに長期キャッシュさせる（将来はWM_VERSIONを更新してバスティング）
+          blobCacheControl: "public, max-age=31536000, immutable",
+        },
+      });
+      log("wm uploaded", { container: WM_CONTAINER, path: wmPath, bytes: u8.byteLength });
+    } catch (upErr: any) {
+      // 既存がある等で失敗しても致命ではないためログのみ
+      log("wm upload error (non-fatal)", String(upErr?.message || upErr));
+    }
 
-    return new NextResponse(u8 as BodyInit, {
-      status: 200,
-      headers: {
-        "Content-Type": "image/jpeg",
-        // ブラウザ & CDN キャッシュ（お好みで調整）
-        "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
-      },
-    });
+    const target = `${publicBase}/${WM_CONTAINER}/${wmPath}`;
+    log("redirecting to new WM", target);
+
+    if (debug) {
+      // In debug mode, return the image directly for inspection
+      return new NextResponse(u8 as BodyInit, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/jpeg",
+          // ブラウザ & CDN キャッシュ（お好みで調整）
+          "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
+        },
+      });
+    }
+
+    return NextResponse.redirect(target, { status: 302 });
   } catch (e: any) {
     console.error("wm error:", e?.message || e);
     // Emit a compact diagnostic into response when debug=1 (non-binary)

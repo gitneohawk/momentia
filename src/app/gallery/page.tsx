@@ -25,6 +25,14 @@ type Item = {
   urls: { thumb: string | null; large: string | null; original?: string };
 };
 
+const formatJPY = (n: number) => n.toLocaleString("ja-JP");
+const buildPurchaseLabel = (canDigital: boolean, canPanel: boolean, priceDigital: number, pricePrintA2: number) => {
+  if (canDigital && canPanel) return `Purchase ¥${formatJPY(priceDigital)}（税込） / A2 ¥${formatJPY(pricePrintA2)}（送料込み、税込）`;
+  if (canDigital) return `Purchase データ ¥${formatJPY(priceDigital)}（税込）`;
+  if (canPanel) return `Purchase A2 ¥${formatJPY(pricePrintA2)}（送料込み、税込）`;
+  return "";
+};
+
 // ===== Small helpers =====
 function useViewportWidth() {
   const [w, setW] = useState<number>(typeof window === "undefined" ? 1200 : window.innerWidth);
@@ -45,17 +53,21 @@ export default function GalleryPage() {
   const rowH = vw < 640 ? 150 : vw < 900 ? 170 : vw < 1280 ? 200 : 220;
 
   useEffect(() => {
+    const ctrl = new AbortController();
+    let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/photos", { cache: "no-store" });
-        const raw = await res.text();
-        const json = raw ? JSON.parse(raw) : { items: [] };
-        if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-        setItems((json.items ?? []) as Item[]);
+        const res = await fetch("/api/photos", { cache: "no-store", signal: ctrl.signal });
+        const ctype = res.headers.get("content-type") || "";
+        const data = ctype.includes("application/json") ? await res.json() : JSON.parse(await res.text() || "{\"items\":[]}");
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        if (mounted) setItems((data.items ?? []) as Item[]);
       } catch (e: any) {
-        setError(String(e?.message || e));
+        if (e?.name === "AbortError") return;
+        if (mounted) setError(String(e?.message || e));
       }
     })();
+    return () => { mounted = false; ctrl.abort(); };
   }, []);
 
   const visibleItems = useMemo(() => items.filter((i) => i.urls.thumb && i.urls.large), [items]);
@@ -74,17 +86,10 @@ export default function GalleryPage() {
   const active = index >= 0 ? visibleItems[index] : null;
   const priceDigital = (active?.priceDigitalJPY ?? 11000) as number;
   const pricePrintA2 = (active?.pricePrintA2JPY ?? 55000) as number;
-
   const canDigital = active ? (active.sellDigital ?? true) : true;
   const canPanel = active ? (active.sellPanel ?? true) : true;
   const hasAnyPurchase = canDigital || canPanel;
-  const purchaseLabel = canDigital && canPanel
-    ? `Purchase ¥${priceDigital.toLocaleString()}（税込） / A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
-    : canDigital
-      ? `Purchase データ ¥${priceDigital.toLocaleString()}（税込）`
-      : canPanel
-        ? `Purchase A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
-        : '';
+  const purchaseLabel = buildPurchaseLabel(canDigital, canPanel, priceDigital, pricePrintA2);
 
   return (
     <div className="bg-neutral-50">
@@ -136,9 +141,18 @@ export default function GalleryPage() {
               image: {
                 className:
                   "m-2 sm:m-3 rounded-2xl shadow-md ring-1 ring-black/5 bg-white/95 transition-transform duration-300 hover:scale-[1.01] hover:shadow-xl overflow-hidden",
+                loading: "lazy",
+                decoding: "async",
+                referrerPolicy: "no-referrer",
+                // sizes: give browser a hint to pick smaller images on small screens
+                sizes: "(max-width: 640px) 50vw, (max-width: 900px) 33vw, (max-width: 1280px) 25vw, 20vw",
               },
             }}
           />
+        )}
+
+        {items.length > 0 && visibleItems.length === 0 && !error && (
+          <div className="text-sm text-neutral-600">表示可能な写真がありません。</div>
         )}
 
         <Lightbox
@@ -169,6 +183,7 @@ export default function GalleryPage() {
                       }}
                       className="inline-flex items-center gap-2 rounded-lg bg-white text-black px-4 py-1.5 text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.99] transition-all"
                       aria-label="Purchase this photo"
+                      title={purchaseLabel || "Purchase"}
                     >
                       <>
                         <span className="hidden md:inline">{purchaseLabel}</span>

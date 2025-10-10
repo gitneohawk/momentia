@@ -2,13 +2,48 @@ import type { NextConfig } from "next";
 const isAzurite = process.env.AZURE_STORAGE_CONNECTION_STRING?.includes('devstoreaccount1') ?? false;
 
 // Minimal, safe-ish Content-Security-Policy. Tweak as needed for external vendors (analytics, fonts, etc.).
-const csp = [
-  "default-src 'self'",
-  "img-src 'self' data: blob: https:",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com data:",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
-].join('; ');
+const azPublicBase = process.env.AZURE_BLOB_PUBLIC_BASE?.trim();
+let azOrigin = "";
+try { if (azPublicBase) azOrigin = new URL(azPublicBase).origin; } catch {}
+const allowAzurite = isAzurite || (azOrigin.startsWith("http://"));
+
+function buildCsp() {
+  const imgSrc = [
+    "'self'",
+    "data:",
+    "blob:",
+    "https:",
+    // allow Azurite http origins only when running against Azurite
+    ...(allowAzurite ? [azOrigin || "http://localhost:10000", "http://azurite-1:10000"] : []),
+  ].join(" ");
+
+  const connectSrc = [
+    "'self'",
+    "https:",
+    "wss:",
+    "ws:",
+    ...(allowAzurite ? [azOrigin || "http://localhost:10000", "http://azurite-1:10000"] : []),
+  ].join(" ");
+
+  const styleSrc = "'self' 'unsafe-inline' https://fonts.googleapis.com";
+  const fontSrc  = "'self' https://fonts.gstatic.com data:";
+  const scriptSrc = "'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com";
+  const frameSrc  = "https://js.stripe.com";
+
+  return [
+    "default-src 'self'",
+    `img-src ${imgSrc}`,
+    `connect-src ${connectSrc}`,
+    `style-src ${styleSrc}`,
+    `font-src ${fontSrc}`,
+    `script-src ${scriptSrc}`,
+    `frame-src ${frameSrc}`,
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+const csp = buildCsp();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -21,6 +56,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       // Azurite / local dev
       { protocol: "http", hostname: "localhost",  port: "10000", pathname: "/devstoreaccount1/photos/**" },
+      { protocol: "http", hostname: "azurite-1", port: "10000", pathname: "/devstoreaccount1/photos/**" },
       // Azure Blob (production)
       { protocol: "https", hostname: "momentia1.blob.core.windows.net", pathname: "/photos/**" },
       { protocol: "https", hostname: "momentiastorage.blob.core.windows.net", pathname: "/photos/**" },
