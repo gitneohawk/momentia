@@ -98,11 +98,22 @@ export async function GET(req: Request) {
     }
   }
 
-  // --- perf: per-request SAS cache & shared time window ---
-  const sasCache = new Map<string, string>();
+  // Cache SAS per request, but also track expiry to avoid serving stale signatures
+  type SasEntry = { url: string; expiresAt: number }; // epoch ms
+  const sasCache = new Map<string, SasEntry>();
+  const isFresh = (e: SasEntry | undefined) => {
+    if (!e) return false;
+    // refresh if less than 30s remaining
+    return e.expiresAt - Date.now() > 30_000;
+  };
+
   const now = new Date();
-  const startsOn = new Date(now.getTime() - 5 * 60 * 1000);
-  const expiresOn = new Date(now.getTime() + 15 * 60 * 1000); // default 15 min; overridden by arg if needed
+  // allow wider skew window to avoid "Authorization" 403 due to clock drift (overridable by env)
+  const SKEW_MIN = Number(process.env.SAS_SKEW_MINUTES ?? 10); // default 10min backdating
+  // round seconds to avoid ms-level drift issues
+  const round = (d: Date) => new Date(Math.floor(d.getTime() / 1000) * 1000);
+  const startsOn = round(new Date(now.getTime() - SKEW_MIN * 60 * 1000));
+  // NOTE: per-call TTL applied later via localExpiresOn
 
   const getSignedUrl = async (
     storagePath: string,
@@ -111,10 +122,11 @@ export async function GET(req: Request) {
   ): Promise<string | null> => {
     const key = `${containerName}|${storagePath}|${ttlMinutes}`;
     const cached = sasCache.get(key);
-    if (cached) return cached;
+    if (isFresh(cached)) return cached!.url;
 
     // use shared window but respect ttl override
-    const localExpiresOn = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+    const localExpiresOn = round(new Date(now.getTime() + ttlMinutes * 60 * 1000));
+    const expiresAt = localExpiresOn.getTime();
 
     // MSI (AAD) 経路: User Delegation SAS を手動生成
     if (process.env.AZURE_USE_MSI === "1") {
@@ -141,7 +153,7 @@ export async function GET(req: Request) {
         ).toString();
         const publicBase = getPublicBase(endpoint);
         const url = `${publicBase}/${containerName}/${encodeURI(storagePath)}?${sas}`;
-        sasCache.set(key, url);
+        sasCache.set(key, { url, expiresAt });
         return url;
       } catch (e) {
         console.error("[/api/photos] user-delegation-sas error", e);
@@ -151,6 +163,9 @@ export async function GET(req: Request) {
 
     // Fallback: Shared Key (接続文字列) での SAS 生成（AzURITE の BlobEndpoint も尊重）
     try {
+      // compute local expiry
+      const localExpiresOn = round(new Date(now.getTime() + ttlMinutes * 60 * 1000));
+      const expiresAt = localExpiresOn.getTime();
       const { endpoint, cred } = getEndpointAndCred();
       const sas = generateBlobSASQueryParameters(
         {
@@ -165,7 +180,7 @@ export async function GET(req: Request) {
       ).toString();
       const publicBase = getPublicBase(endpoint);
       const url = `${publicBase}/${containerName}/${encodeURI(storagePath)}?${sas}`;
-      sasCache.set(key, url);
+      sasCache.set(key, { url, expiresAt });
       return url;
     } catch (e) {
       console.error("[/api/photos] shared-key-sas error", e);
