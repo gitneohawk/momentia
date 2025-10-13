@@ -65,6 +65,14 @@ function getPublicBase(endpoint: string) {
   return endpoint.replace(/\/+$/, "");
 }
 
+// info log helper: mute in production unless explicitly enabled
+const logInfo = (...args: any[]) => {
+  if (process.env.DEBUG_API_PHOTOS === "1" || process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    (console.info as any)(...args);
+  }
+};
+
 export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const q = searchParams.get("q")?.trim();
@@ -81,7 +89,7 @@ export async function GET(req: Request) {
   if ((globalThis as any).__photosBootLogged__ !== true) {
     (globalThis as any).__photosBootLogged__ = true;
     try {
-      console.info("[/api/photos] boot env check(rt)", {
+      logInfo("[/api/photos] boot env check(rt)", {
         hasConn: Boolean(CONN), hasAcc: Boolean(ACC), acc: mask(ACC),
         hasKey: Boolean(KEY), keyLen: KEY?.length ?? 0, nodeEnv: process.env.NODE_ENV,
       });
@@ -90,15 +98,27 @@ export async function GET(req: Request) {
     }
   }
 
-  const getSignedUrl = async (storagePath: string, ttlMinutes = 15): Promise<string | null> => {
-    const now = new Date();
-    const startsOn = new Date(now.getTime() - 5 * 60 * 1000);
-    const expiresOn = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+  // --- perf: per-request SAS cache & shared time window ---
+  const sasCache = new Map<string, string>();
+  const now = new Date();
+  const startsOn = new Date(now.getTime() - 5 * 60 * 1000);
+  const expiresOn = new Date(now.getTime() + 15 * 60 * 1000); // default 15 min; overridden by arg if needed
+
+  const getSignedUrl = async (
+    storagePath: string,
+    ttlMinutes = 15,
+    containerName: string = container
+  ): Promise<string | null> => {
+    const key = `${containerName}|${storagePath}|${ttlMinutes}`;
+    const cached = sasCache.get(key);
+    if (cached) return cached;
+
+    // use shared window but respect ttl override
+    const localExpiresOn = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
     // MSI (AAD) 経路: User Delegation SAS を手動生成
     if (process.env.AZURE_USE_MSI === "1") {
       if (!ACCOUNT) return null;
-      // Prefer connection string endpoint when available (mainly for local Azurite won't use MSI, but keep logic consistent)
       let endpoint = `https://${ACCOUNT}.blob.core.windows.net`;
       try {
         const { endpoint: ep } = getEndpointAndCred();
@@ -106,21 +126,23 @@ export async function GET(req: Request) {
       } catch {}
       const svc = new BlobServiceClient(endpoint, new DefaultAzureCredential());
       try {
-        const udk = await svc.getUserDelegationKey(startsOn, expiresOn);
+        const udk = await svc.getUserDelegationKey(startsOn, localExpiresOn);
         const sas = generateBlobSASQueryParameters(
           {
-            containerName: container,
+            containerName,
             blobName: storagePath,
             permissions: BlobSASPermissions.parse("r"),
             startsOn,
-            expiresOn,
+            expiresOn: localExpiresOn,
             version: "2021-08-06",
           },
           udk,
           ACCOUNT
         ).toString();
         const publicBase = getPublicBase(endpoint);
-        return `${publicBase}/${container}/${encodeURI(storagePath)}?${sas}`;
+        const url = `${publicBase}/${containerName}/${encodeURI(storagePath)}?${sas}`;
+        sasCache.set(key, url);
+        return url;
       } catch (e) {
         console.error("[/api/photos] user-delegation-sas error", e);
         // フォールバックに続く
@@ -132,24 +154,26 @@ export async function GET(req: Request) {
       const { endpoint, cred } = getEndpointAndCred();
       const sas = generateBlobSASQueryParameters(
         {
-          containerName: container,
+          containerName,
           blobName: storagePath,
           permissions: BlobSASPermissions.parse("r"),
           startsOn,
-          expiresOn,
+          expiresOn: localExpiresOn,
           version: "2021-08-06",
         },
         cred
       ).toString();
       const publicBase = getPublicBase(endpoint);
-      return `${publicBase}/${container}/${encodeURI(storagePath)}?${sas}`;
+      const url = `${publicBase}/${containerName}/${encodeURI(storagePath)}?${sas}`;
+      sasCache.set(key, url);
+      return url;
     } catch (e) {
       console.error("[/api/photos] shared-key-sas error", e);
       return null;
     }
   };
 
-  console.info("[/api/photos] request", { q, kw, limit });
+  logInfo("[/api/photos] request", { q, kw, limit });
 
   let photos: PhotoWithRels[] = [];
   try {
@@ -171,6 +195,7 @@ export async function GET(req: Request) {
   const items = await Promise.all(photos.map(async (p) => {
     const thumb = p.variants.find((v: Variant) => v.type === "thumb");
     const large = p.variants.find((v: Variant) => v.type === "large");
+    const wmName = `${p.slug}_wm_2048_v1.jpg`;
     return {
       slug: p.slug, width: p.width, height: p.height, caption: p.caption,
       capturedAt: p.capturedAt, keywords: p.keywords.map((k: Keyword) => k.word),
@@ -182,9 +207,20 @@ export async function GET(req: Request) {
         original: await getSignedUrl(p.storagePath),
         thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,
         large: large ? await getSignedUrl(large.storagePath) : null,
+        watermarked: await getSignedUrl(wmName, 15, "watermarks"),
       },
     };
   }));
 
-  return NextResponse.json({ items }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { items },
+    {
+      headers: {
+        // Browser & CDN cache: 10 minutes; allow brief SWR window for smoother UX
+        "Cache-Control": "public, max-age=600, s-maxage=600, stale-while-revalidate=60",
+        // Safety: avoid intermediary confusion (optional but harmless)
+        Vary: "Accept-Encoding",
+      },
+    }
+  );
 }

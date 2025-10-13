@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { BlobServiceClient } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
 import sharp from "sharp";
+import crypto from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,12 @@ export const dynamic = "force-dynamic";
 // Debug switch: enable by calling /api/wm/[slug]?debug=1
 const DEBUG_QUERY_KEY = "debug";
 
-const CONTAINER = "photos";
+const PHOTO_CONTAINER = "photos";
+// Azure Blob container name must be 3–63 lowercase letters/numbers/hyphens
+const WM_CONTAINER = (() => {
+  const v = (process.env.WM_CONTAINER || "watermarks").toLowerCase();
+  return /^[a-z0-9-]{3,63}$/.test(v) ? v : "watermarks";
+})();
 const QUALITY = 85;          // 出力JPEG品質
 const _MARGIN = 24;           // 端からの余白(px)
 const WM_TEXT = "© Evoluzio Inc. — Preview"; // 透かし文言
@@ -42,15 +48,49 @@ function svgWatermark(text: string, imgWidth: number) {
   return { svgBuffer, svgWidth, svgHeight };
 }
 
+// slug を安全化（非常に長い/スラッシュ含む等は短縮）
+function safeSlug(slug: string) {
+  const s = (slug || "").trim();
+  if (!s || s.length > 100 || /[\\/]/.test(s)) {
+    return crypto.createHash("sha1").update(s).digest("hex").slice(0, 16);
+  }
+  return s;
+}
 
-function getContainerClient(log?: (...args: any[]) => void) {
+function wmFileName(slug: string, width: number) {
+  const short = safeSlug(slug);
+  return `${short}_wm_${width}_v1.jpg`;
+}
+
+function thumbFileName(slug: string, width: number) {
+  const short = safeSlug(slug);
+  return `${short}_thumb_${width}.jpg`;
+}
+
+// storagePath がフルURL/コンテナ名付きの場合に Blob 名のみへ正規化
+function normalizeSourceBlobPath(input: string): string {
+  if (!input) return input;
+  const p = input.trim().replace(/^\/+/, "");
+  if (/^https?:\/\//i.test(p)) {
+    try {
+      const u = new URL(p);
+      const path = u.pathname.replace(/^\/+/, ""); // container/blob...
+      const parts = path.split("/");
+      if (parts.length >= 2) return parts.slice(1).join("/");
+      return path;
+    } catch {}
+  }
+  if (p.startsWith(`${PHOTO_CONTAINER}/`)) return p.slice(PHOTO_CONTAINER.length + 1);
+  return p;
+}
+
+
+function getBlobService(log?: (...args: any[]) => void) {
   const account =
     process.env.AZURE_STORAGE_ACCOUNT ||
     process.env.STORAGE_ACCOUNT_NAME ||
     process.env.NEXT_PUBLIC_STORAGE_ACCOUNT;
 
-  // Detect if Managed Identity is available in the container environment
-  // (ACA/Functions/VMs expose one or more of these variables when MSI is enabled)
   const msiAvailable = Boolean(
     process.env.IDENTITY_ENDPOINT ||
     process.env.MSI_ENDPOINT ||
@@ -59,25 +99,17 @@ function getContainerClient(log?: (...args: any[]) => void) {
 
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
 
-  // Prefer Managed Identity when available (more robust than conn strings, which may rotate)
   if (msiAvailable && account) {
     log?.("auth", { mode: "managed-identity", account });
     const url = `https://${account}.blob.core.windows.net`;
     const credential = new DefaultAzureCredential();
-    const service = new BlobServiceClient(url, credential);
-    return service.getContainerClient(CONTAINER);
+    return new BlobServiceClient(url, credential);
   }
-
   if (conn) {
-    // Fall back to connection string
-    // (Optional) try to extract account name for logging
     const acctMatch = conn.match(/AccountName=([^;]+)/i);
     log?.("auth", { mode: "conn-string", account: acctMatch?.[1] ?? undefined });
-    const service = BlobServiceClient.fromConnectionString(conn);
-    return service.getContainerClient(CONTAINER);
+    return BlobServiceClient.fromConnectionString(conn);
   }
-
-  // If we reach here, we don't have enough info
   throw new Error(
     "Storage configuration missing. Provide either Managed Identity + AZURE_STORAGE_ACCOUNT (or STORAGE_ACCOUNT_NAME / NEXT_PUBLIC_STORAGE_ACCOUNT), or AZURE_STORAGE_CONNECTION_STRING."
   );
@@ -91,7 +123,8 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export async function GET(
   _req: Request,
-  ctx: { params: Promise<{ slug: string }> }
+  // Next.js injects context at runtime; relax typing to avoid mismatch across versions
+  context: any
 ) {
   // Parse debug flag from query string
   const url = new URL(_req.url);
@@ -107,10 +140,9 @@ export async function GET(
   log("request start", { url: url.pathname + url.search });
 
   try {
-    const { slug } = await ctx.params;
+    const { slug } = context.params as { slug: string };
 
     log("slug", slug);
-
 
     // DB から対象写真と large 版のパスを取る
     const photo = await prisma.photo.findUnique({
@@ -124,10 +156,22 @@ export async function GET(
     const sourcePath = (large?.storagePath ?? photo.storagePath); // large 無ければオリジナル
     log("sourcePath", sourcePath, "chosenVariant", large ? "large" : "original");
 
-    const container = getContainerClient(log);
-    const blobClient = container.getBlockBlobClient(sourcePath);
-    log("downloading", { blob: sourcePath });
-    const dl = await blobClient.download();
+    const qWidth = parseInt(url.searchParams.get("w") ?? "2048", 10);
+    const widthReq = isNaN(qWidth) ? 2048 : qWidth;
+    const widthOut = Math.min(4096, Math.max(320, widthReq));
+    const noWm = url.searchParams.get("nowm") === "1" || url.searchParams.get("wm") === "0";
+    const refresh = url.searchParams.get("refresh") === "1";
+    const _generate = url.searchParams.get("generate") === "1"; // 生成を強制（未使用でもtrueで同じ）
+
+    const service = getBlobService(log);
+    const photos = service.getContainerClient(PHOTO_CONTAINER);
+    const wm = service.getContainerClient(WM_CONTAINER);
+    await wm.createIfNotExists(); // 409 OK
+
+    const normPath = normalizeSourceBlobPath(sourcePath);
+    log("downloading", { blob: normPath });
+    const srcBlob = photos.getBlockBlobClient(normPath);
+    const dl = await srcBlob.download();
     const input = await streamToBuffer(dl.readableStreamBody!);
     log("blob downloaded", { contentLength: dl.contentLength, bufLen: input.length });
 
@@ -135,54 +179,76 @@ export async function GET(
     const img = sharp(input).rotate();
     const meta = await img.metadata();
     log("image metadata (pre)", { width: meta.width, height: meta.height, format: meta.format, hasProfile: Boolean(meta.icc) });
-    const { width = 0, height = 0 } = meta;
-    const { svgBuffer: wm, svgWidth: wmWidth, svgHeight: wmHeight } = svgWatermark(WM_TEXT, width || 0);
-    log("wm computed", { text: WM_TEXT, wmWidth, wmHeight });
 
-// 透かしの配置：センター or 右下
-let left: number, top: number;
+    const outName = noWm ? thumbFileName(slug, widthOut) : wmFileName(slug, widthOut);
+    const outBlob = wm.getBlockBlobClient(outName);
 
-if (_WM_PLACEMENT === "center") {
-  // 画像中心に配置（はみ出し防止で 0 を下限）
-  left = Math.max(0, Math.round(((width || 0) - wmWidth) / 2));
-  top  = Math.max(0, Math.round(((height || 0) - wmHeight) / 2));
-} else {
-  // 右下にマージンを取って配置
-  left = Math.max(0, (width || 0) - wmWidth - _MARGIN);
-  top  = Math.max(0, (height || 0) - wmHeight - _MARGIN);
-}
+    if (!refresh) {
+      try {
+        const head = await outBlob.getProperties();
+        if (head?.contentLength && head.contentLength > 0) {
+          const dl2 = await outBlob.download();
+          const buf = await streamToBuffer(dl2.readableStreamBody!);
+          log("cache-hit", { outName, bytes: buf.length, noWm });
+          return new NextResponse(new Uint8Array(buf) as BodyInit, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/jpeg",
+              "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
+            },
+          });
+        }
+      } catch {
+        log("cache-miss", outName);
+      }
+    }
 
-log("placement", {
-  mode: _WM_PLACEMENT,
-  width, height, left, top, margin: _MARGIN
-});
+    let composed: Buffer;
+    if (noWm) {
+      composed = await sharp(input)
+        .rotate()
+        .resize({ width: widthOut, withoutEnlargement: true })
+        .jpeg({ quality: Math.min(QUALITY, 82), mozjpeg: true })
+        .toBuffer();
+      log("composed-nowm", { widthOut, bytes: composed.length });
+    } else {
+      const { width = 0, height = 0 } = meta;
+      const { svgBuffer: wmBuf, svgWidth: wmWidth, svgHeight: wmHeight } = svgWatermark(WM_TEXT, width || widthOut);
+      let left: number, top: number;
+      if (_WM_PLACEMENT === "center") {
+        left = Math.max(0, Math.round(((width || widthOut) - wmWidth) / 2));
+        top = Math.max(0, Math.round(((height || Math.round(widthOut * 0.66)) - wmHeight) / 2));
+      } else {
+        left = Math.max(0, (width || widthOut) - wmWidth - _MARGIN);
+        top = Math.max(0, (height || Math.round(widthOut * 0.66)) - wmHeight - _MARGIN);
+      }
+      log("placement", { mode: _WM_PLACEMENT, width, height, left, top, margin: _MARGIN });
+      composed = await sharp(input)
+        .rotate()
+        .resize({ width: widthOut, withoutEnlargement: true })
+        .composite([{ input: wmBuf, left, top }])
+        .jpeg({ quality: QUALITY, mozjpeg: true })
+        .toBuffer();
+      log("composed-wm", { widthOut, bytes: composed.length });
+    }
 
-    const composed = await img
-      .composite([
-        {
-          input: wm,
-          left,
-          top,
+    try {
+      await outBlob.uploadData(composed, {
+        blobHTTPHeaders: {
+          blobContentType: "image/jpeg",
+          blobCacheControl: "public, max-age=31536000, immutable",
         },
-      ])
-      .jpeg({ quality: QUALITY, mozjpeg: true })
-      .toBuffer();
-    log("composed buffer", { bytes: composed.length });
+      });
+      log("out-uploaded", { outName, bytes: composed.length, noWm });
+    } catch (e: any) {
+      log("out-upload-error", String(e?.message || e));
+    }
 
-    // Convert Node.js Buffer to a Uint8Array (BodyInit compatible for NextResponse)
-    const u8 = new Uint8Array(
-      composed.buffer,
-      composed.byteOffset,
-      composed.byteLength
-    );
-
-    log("responding image/jpeg");
-
+    const u8 = new Uint8Array(composed.buffer, composed.byteOffset, composed.byteLength);
     return new NextResponse(u8 as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
-        // ブラウザ & CDN キャッシュ（お好みで調整）
         "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
       },
     });

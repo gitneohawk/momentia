@@ -36,24 +36,32 @@ export async function GET(
     const thumb = p.variants.find(v => v.type === "thumb");
     const large = p.variants.find(v => v.type === "large");
 
-    return NextResponse.json({
-      slug: p.slug,
-      width: p.width,
-      height: p.height,
-      caption: p.caption,
-      keywords: p.keywords.map(k => k.word),
-      priceDigitalJPY: p.priceDigitalJPY ?? 11000,
-      pricePrintA2JPY: p.pricePrintA2JPY ?? 55000,
-      sellDigital: p.sellDigital ?? true,
-      sellPanel: p.sellPanel ?? true,
-      urls: {
-        original: base + p.storagePath,
-        thumb: thumb ? base + thumb.storagePath : null,
-        large: large ? base + large.storagePath : null,
-        // 購入ページのプレビューは透かしAPIを使うと安全
-        watermarked: `/api/wm/${p.slug}`,
+    return NextResponse.json(
+      {
+        slug: p.slug,
+        width: p.width,
+        height: p.height,
+        caption: p.caption,
+        keywords: p.keywords.map(k => k.word),
+        priceDigitalJPY: p.priceDigitalJPY ?? 11000,
+        pricePrintA2JPY: p.pricePrintA2JPY ?? 55000,
+        sellDigital: p.sellDigital ?? true,
+        sellPanel: p.sellPanel ?? true,
+        urls: {
+          original: base + p.storagePath,
+          thumb: thumb ? base + thumb.storagePath : null,
+          large: large ? base + large.storagePath : null,
+          watermarked: `/api/wm/${p.slug}`,
+        },
       },
-    }, { headers: { "Cache-Control": "no-store" }});
+      {
+        headers: {
+          // Cache for 10 minutes client/CDN, SWR 1 minute for smoother UX
+          "Cache-Control": "public, max-age=600, s-maxage=600, stale-while-revalidate=60",
+          Vary: "Accept-Encoding",
+        },
+      }
+    );
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }

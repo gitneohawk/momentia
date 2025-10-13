@@ -107,6 +107,7 @@ function slugify(input: string): string {
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
+    const wantWm = (form.get("wm") === "1" || form.get("wm") === "true");
     const file = form.get("file");
     if (!file || typeof file === "string") {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
@@ -200,6 +201,21 @@ export async function POST(req: Request) {
       await prisma.keyword.createMany({ data: kws.slice(0, 16).map((word) => ({ photoId: photo.id, word })) });
     }
 
+    // Optional: kick off WM generation asynchronously (non-blocking)
+    if (wantWm) {
+      try {
+        const origin = new URL(req.url).origin;
+        const wmUrl = `${origin}/api/wm/${encodeURIComponent(slug)}?generate=1&w=2048`;
+        // fire-and-forget; do not await
+        void fetch(wmUrl, { cache: "no-store" }).then(() => {
+          console.log("[upload] wm trigger ok", slug);
+        }).catch((e) => {
+          console.warn("[upload] wm trigger failed", e?.message || e);
+        });
+      } catch (e) {
+        console.warn("[upload] wm trigger error", (e as any)?.message || e);
+      }
+    }
     return NextResponse.json({ ok: true, slug });
   } catch (e: any) {
     console.error(e);
