@@ -22,7 +22,7 @@ type Item = {
   pricePrintA2JPY?: number | null;
   sellDigital?: boolean;
   sellPanel?: boolean;
-  urls: { thumb: string | null; large: string | null; original?: string };
+  urls: { thumb: string | null; large: string | null; watermarked?: string | null; original?: string };
 };
 
 // ===== Small helpers =====
@@ -47,7 +47,7 @@ export default function GalleryPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/photos", { cache: "no-store" });
+        const res = await fetch("/api/photos");
         const raw = await res.text();
         const json = raw ? JSON.parse(raw) : { items: [] };
         if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
@@ -146,8 +146,8 @@ export default function GalleryPage() {
           close={() => setIndex(-1)}
           index={index >= 0 ? index : 0}
           slides={visibleItems.map((i) => ({
-            // Always use watermarking API for enlarged view
-            src: `/api/wm/${i.slug}`,
+            // Prefer pre-generated watermarked blob; fallback to large or thumb
+            src: i.urls.watermarked ?? i.urls.large ?? (i.urls.thumb as string),
             description: i.caption ?? "",
           }))}
           animation={{ fade: 250 }}

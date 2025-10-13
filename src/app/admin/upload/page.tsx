@@ -6,6 +6,7 @@ export default function AdminUploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [wm, setWm] = useState(true); // アップロード後にWM生成（推奨）
 
   const onChangeFiles = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -25,6 +26,7 @@ export default function AdminUploadPage() {
       for (const file of files) {
         const form = new FormData();
         form.append("file", file);
+        form.append("wm", wm ? "1" : "0");
         const res = await fetch("/api/upload", { method: "POST", body: form });
         const json = await res.json();
         setLogs(prev => [
@@ -38,7 +40,7 @@ export default function AdminUploadPage() {
     } finally {
       setBusy(false);
     }
-  }, [files]);
+  }, [files, wm]);
 
   return (
     <section className="grid gap-8">
@@ -55,8 +57,18 @@ export default function AdminUploadPage() {
         ドロップして追加
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <input type="file" multiple accept="image/*" onChange={onChangeFiles} />
+        <label className="inline-flex items-center gap-2 text-sm select-none">
+          <input
+            type="checkbox"
+            checked={wm}
+            onChange={(e) => setWm(e.target.checked)}
+            className="accent-black"
+            disabled={busy}
+          />
+          アップロード後にWM生成（推奨）
+        </label>
         <button
           onClick={onUpload}
           disabled={busy || !files.length}

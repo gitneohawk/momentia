@@ -68,3 +68,5 @@ prisma/dev.db-journal
 
 # utilities
 /scripts/
+
+/data/azurite
