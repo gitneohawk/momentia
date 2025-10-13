@@ -86,6 +86,8 @@ export default function GalleryPage() {
         ? `Purchase A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
         : '';
 
+  const wmSrc = (slug: string) => `/api/wm/${encodeURIComponent(slug)}?w=2048`;
+
   return (
     <div className="bg-neutral-50">
       <section className="grid gap-10 px-4 sm:px-6 max-w-5xl md:max-w-6xl lg:max-w-7xl mx-auto py-6 sm:py-8">
@@ -146,8 +148,8 @@ export default function GalleryPage() {
           close={() => setIndex(-1)}
           index={index >= 0 ? index : 0}
           slides={visibleItems.map((i) => ({
-            // Prefer pre-generated watermarked blob; fallback to large or thumb
-            src: i.urls.watermarked ?? i.urls.large ?? (i.urls.thumb as string),
+            // Always go through the WM API so it can return existing WM or generate on demand
+            src: wmSrc(i.slug),
             description: i.caption ?? "",
           }))}
           animation={{ fade: 250 }}

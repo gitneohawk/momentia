@@ -81,6 +81,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - **アプリケーションログ**
   - 重要イベントを構造化 JSON で出力（注文作成、ステータス変更、Webhook バリデーション失敗など）
   - ログレベル: `info`/`warn`/`error` を明確化、PII マスク
+  - `/api/photos` の info ログは本番環境で抑制済み（`logInfo` ヘルパーで NODE_ENV と DEBUG_API_PHOTOS 環境変数で制御）
 - **外部サービス**
   - Stripe: Webhook 失敗の再試行を許可し、失敗時にメール／Teams 通知
 - **運用 Runbook**
@@ -103,8 +104,8 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
   - [ ] B案: 2列グリッド（最大4枚）＋「もっと見る」→ /gallery
   - [ ] サムネ `sizes="(max-width: 640px) 50vw, 33vw"`
 
-- [ ] Lightbox: ウォーターマーク画像の事前生成
-  - [ ] Upload時に `photos/wm/<slug>_wm_2048.jpg` を生成（sharpで合成）
+- [x] Lightbox: ウォーターマーク画像の事前生成
+  - [x] Upload時に `photos/watermarks/<slug>_wm_2048_v1.jpg` を生成（sharpで合成済み・動作検証済み）
   - [ ] `/api/wm/[slug]` は存在チェック→あれば302、無ければ生成→保存→302
   - [ ] Blobに `Cache-Control: public, max-age=31536000, immutable` を設定
   - [ ] ファイル名に `wm` のバージョンを含める（例 `_wm-v2_`）
@@ -122,10 +123,10 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
   - [ ] `rowConstraints.minPhotos: 1`（少枚数でも崩れない）
   - [ ] サムネは480px（DPR2向けに960pxまで許容）
 
-- [ ] 本番キャッシュ/TTL
-  - [ ] public画像: CDN長期キャッシュ
-  - [ ] `/api/photos`: `s-maxage=60, stale-while-revalidate=600`
-  - [ ] SAS TTL: thumb/large=30–60分、wm=24h
+- [x] 本番キャッシュ/TTL
+  - [x] public画像: CDN長期キャッシュ
+  - [x] `/api/photos`: `s-maxage=60, stale-while-revalidate=600`
+  - [x] SAS TTL: thumb/large=30–60分、wm=24h
 
 - [ ] Lightbox 2048対応
   - [ ] 2048pxはPC向けのみ提供、モバイルは480pxを利用
@@ -135,7 +136,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 
 ## デプロイ・運用メモ
 
-- [ ] 背景色を固定のライトに（`globals.css`で`color-scheme: light`、`min-height: 100svh`を設定）
+- [x] 背景色を固定のライトに（`globals.css`で`color-scheme: light`、`min-height: 100svh`を設定）
 - [ ] デプロイ後のモバイルレイアウト確認（Pixel9a実機確認済み）
 - [ ] ACAメトリクスを監視。Front Door導入でCDN/アクセスログも検討
 - [ ] Container Apps の Diagnostic settings で Log Analytics に送信（AppLogs/IngressLogs/KubeEvents）
@@ -144,6 +145,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] 監視設定の IaC 化（Bicep/Terraform もしくは `az monitor` スクリプト）
 - [ ] ACS 送信ログを Log Analytics に転送し、配信失敗割合のアラートを作成
 - [ ] Stripe Webhook のイベント処理ログに `orderId` / `customerEmail` を必ず含める（PIIは必要最小限）
+- [ ] 本番リリース時に HTTP Header（Content-Security-Policy等）の再検討を行う（現状は開発検証用に緩和中）
 
 ## 問い合わせフォーム / メール通知関連
 
