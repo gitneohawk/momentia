@@ -15,7 +15,9 @@ const DEBUG_QUERY_KEY = "debug";
 const PHOTO_CONTAINER = "photos";
 // Azure Blob container name must be 3–63 lowercase letters/numbers/hyphens
 const WM_CONTAINER = (() => {
-  const v = (process.env.WM_CONTAINER || "watermarks").toLowerCase();
+  // Prefer AZURE_BLOB_WATERMARKS_CONTAINER (prod env), fallback to WM_CONTAINER (legacy), default "watermarks"
+  const raw = process.env.AZURE_BLOB_WATERMARKS_CONTAINER || process.env.WM_CONTAINER || "watermarks";
+  const v = raw.toLowerCase();
   return /^[a-z0-9-]{3,63}$/.test(v) ? v : "watermarks";
 })();
 const QUALITY = 85;          // 出力JPEG品質
@@ -70,17 +72,24 @@ function thumbFileName(slug: string, width: number) {
 // storagePath がフルURL/コンテナ名付きの場合に Blob 名のみへ正規化
 function normalizeSourceBlobPath(input: string): string {
   if (!input) return input;
-  const p = input.trim().replace(/^\/+/, "");
+  let p = input.trim().replace(/^\/+/, "");
   if (/^https?:\/\//i.test(p)) {
     try {
       const u = new URL(p);
       const path = u.pathname.replace(/^\/+/, ""); // container/blob...
       const parts = path.split("/");
-      if (parts.length >= 2) return parts.slice(1).join("/");
-      return path;
-    } catch {}
+      if (parts.length >= 2) p = parts.slice(1).join("/"); // drop container segment
+      else p = path;
+    } catch {
+      // fall through with original p
+    }
   }
-  if (p.startsWith(`${PHOTO_CONTAINER}/`)) return p.slice(PHOTO_CONTAINER.length + 1);
+  if (p.startsWith(`${PHOTO_CONTAINER}/`)) {
+    p = p.slice(PHOTO_CONTAINER.length + 1); // "photos/public/..." -> "public/..."
+  }
+  if (!p.startsWith("public/")) {
+    p = `public/${p}`; // force public/ prefix
+  }
   return p;
 }
 
@@ -168,10 +177,24 @@ export async function GET(
     const wm = service.getContainerClient(WM_CONTAINER);
     await wm.createIfNotExists(); // 409 OK
 
-    const normPath = normalizeSourceBlobPath(sourcePath);
+    let normPath = normalizeSourceBlobPath(sourcePath);
+    let srcBlob = photos.getBlockBlobClient(normPath);
     log("downloading", { blob: normPath });
-    const srcBlob = photos.getBlockBlobClient(normPath);
-    const dl = await srcBlob.download();
+    let dl;
+    try {
+      dl = await srcBlob.download();
+    } catch (e: any) {
+      // Fallback to canonical large name (public/<slug>_2048.jpg) for older records or missing variant paths
+      const fallback = `public/${slug}_2048.jpg`;
+      if (fallback !== normPath) {
+        log("source-miss-fallback", { from: normPath, to: fallback });
+        normPath = fallback;
+        srcBlob = photos.getBlockBlobClient(normPath);
+        dl = await srcBlob.download();
+      } else {
+        throw e;
+      }
+    }
     const input = await streamToBuffer(dl.readableStreamBody!);
     log("blob downloaded", { contentLength: dl.contentLength, bufLen: input.length });
 

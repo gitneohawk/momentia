@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PhotoAlbum from "react-photo-album";
@@ -47,7 +47,7 @@ export default function GalleryPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/photos");
+        const res = await fetch("/api/photos", { cache: "force-cache" });
         const raw = await res.text();
         const json = raw ? JSON.parse(raw) : { items: [] };
         if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
@@ -58,18 +58,16 @@ export default function GalleryPage() {
     })();
   }, []);
 
-  const visibleItems = useMemo(() => items.filter((i) => i.urls.thumb && i.urls.large), [items]);
+  const visibleItems = items.filter((i) => i.urls.thumb && i.urls.large);
 
-  const photos = useMemo(() => {
-    return visibleItems.map((i) => ({
-      key: i.slug,
-      src: i.urls.thumb as string,
-      width: i.width,
-      height: i.height,
-      largeSrc: i.urls.large as string,
-      caption: i.caption ?? "",
-    }));
-  }, [visibleItems]);
+  const photos = visibleItems.map((i) => ({
+    key: i.slug,
+    src: i.urls.thumb as string,
+    width: i.width,
+    height: i.height,
+    largeSrc: i.urls.large as string,
+    caption: i.caption ?? "",
+  }));
 
   const active = index >= 0 ? visibleItems[index] : null;
   const priceDigital = (active?.priceDigitalJPY ?? 11000) as number;
@@ -119,7 +117,7 @@ export default function GalleryPage() {
         {/* Loading skeleton */}
         {items.length === 0 && !error && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {Array.from({ length: 12 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-neutral-200" />
             ))}
           </div>
@@ -132,7 +130,7 @@ export default function GalleryPage() {
             layout="rows"
             photos={photos.map((p) => ({ src: p.src, width: p.width, height: p.height, key: p.key }))}
             targetRowHeight={rowH}
-            rowConstraints={{ minPhotos: 2, maxPhotos: 3 }}
+            rowConstraints={{ minPhotos: 2, maxPhotos: 4 }}
             onClick={({ index }) => setIndex(index)}
             componentsProps={{
               image: {

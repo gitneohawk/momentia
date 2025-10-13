@@ -5,6 +5,7 @@ import { DefaultAzureCredential } from "@azure/identity";
 
 import sharp from "sharp";
 import * as exifr from "exifr";
+import { generateWatermark } from "@/lib/watermark";
 
 export const runtime = "nodejs";       // sharp を使うため Node 実行
 export const dynamic = "force-dynamic"; // 開発中はキャッシュ無効でOK
@@ -13,6 +14,11 @@ const CONTAINER_NAME = "photos";
 const ORIG_PREFIX = "originals/";
 const PUB_PREFIX = "public/";
 const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT || "momentiastorage";
+
+// --- helpers (env / logging) ---
+const isProd = process.env.NODE_ENV === "production";
+const info = (...args: any[]) => { if (!isProd) console.info(...args); };
+const warn = (...args: any[]) => console.warn(...args);
 
 function parseConnString(raw: string) {
   const s = raw.trim().replace(/^\s*['"]|['"]\s*$/g, ""); // strip quotes/whitespace
@@ -108,6 +114,7 @@ export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const wantWm = (form.get("wm") === "1" || form.get("wm") === "true");
+    const publishNow = (form.get("publish") === "1" || form.get("publish") === "true");
     const file = form.get("file");
     if (!file || typeof file === "string") {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
@@ -177,7 +184,7 @@ export async function POST(req: Request) {
           ? new Date((exifData as any).DateTimeOriginal)
           : ((exifData as any)?.CreateDate ? new Date((exifData as any).CreateDate) : null),
         exifRaw: exifData || {},
-        published: false, // 初期状態は非公開
+        published: publishNow, // フォーム指定があれば即公開
       },
     });
 
@@ -201,20 +208,12 @@ export async function POST(req: Request) {
       await prisma.keyword.createMany({ data: kws.slice(0, 16).map((word) => ({ photoId: photo.id, word })) });
     }
 
-    // Optional: kick off WM generation asynchronously (non-blocking)
+    // Optional: kick off WM generation asynchronously (non-blocking, no self-fetch)
     if (wantWm) {
-      try {
-        const origin = new URL(req.url).origin;
-        const wmUrl = `${origin}/api/wm/${encodeURIComponent(slug)}?generate=1&w=2048`;
-        // fire-and-forget; do not await
-        void fetch(wmUrl, { cache: "no-store" }).then(() => {
-          console.log("[upload] wm trigger ok", slug);
-        }).catch((e) => {
-          console.warn("[upload] wm trigger failed", e?.message || e);
-        });
-      } catch (e) {
-        console.warn("[upload] wm trigger error", (e as any)?.message || e);
-      }
+      void generateWatermark({ slug, width: 2048 }).then(
+        () => info("[upload] wm generate triggered", { slug }),
+        (e) => warn("[upload] wm generate failed", { slug, err: e?.message || String(e) })
+      );
     }
     return NextResponse.json({ ok: true, slug });
   } catch (e: any) {
