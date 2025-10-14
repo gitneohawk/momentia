@@ -2,10 +2,32 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { withAuth } from "next-auth/middleware";
 
+const CANONICAL_HOST = "www.momentia.photo" as const;
+
 export function middleware(req: NextRequest) {
+  const url = req.nextUrl.clone();
+  const host = req.headers.get("host")?.toLowerCase() || "";
+
+  // In production, force all traffic to the canonical host for stable cookies/session.
+  if (process.env.NODE_ENV === "production") {
+    // Allow apex domain (momentia.photo) to remain as-is per product decision; only enforce for non-canonical hosts.
+    const isCanonical = host === CANONICAL_HOST;
+    const isApex = host === "momentia.photo";
+    if (!isCanonical && !isApex) {
+      url.host = CANONICAL_HOST;
+      url.protocol = "https:";
+      return NextResponse.redirect(url, 308);
+    }
+  }
+
   const isDev = process.env.NODE_ENV !== "production";
   const disableCsp = process.env.DISABLE_DEV_CSP === "1" || process.env.DISABLE_DEV_CSP === "true";
   if (isDev && disableCsp) {
+    return NextResponse.next();
+  }
+
+  // Do not attach CSP to API routes; redirect already handled above
+  if (url.pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
@@ -40,5 +62,10 @@ export const authMiddleware = withAuth(
 
 // Run middleware only for admin UIs and admin APIs
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)", "/admin/:path*", "/api/admin/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico).*)", // all app routes (including pages) but not static assets
+    "/api/auth/:path*", // ensure canonical host for NextAuth
+    "/admin/:path*",
+    "/api/admin/:path*",
+  ],
 };
