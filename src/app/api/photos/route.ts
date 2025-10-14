@@ -18,6 +18,12 @@ function mask(s?: string | null, showPrefix = 3) {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Cache TTL (API response) can be tuned by env. In dev, default to no-store.
+const API_TTL_SEC =
+  Number(process.env.API_PHOTOS_TTL_SEC ?? (process.env.NODE_ENV === "production" ? 600 : 0));
+const API_SWR_SEC =
+  Number(process.env.API_PHOTOS_SWR_SEC ?? (process.env.NODE_ENV === "production" ? 60 : 0));
+
 type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }> & {
   sellDigital?: boolean | null;
   sellPanel?: boolean | null;
@@ -108,6 +114,9 @@ export async function GET(req: Request) {
   };
 
   const now = new Date();
+  // Ensure SAS lifetime comfortably exceeds API cache TTL to avoid 403 due to expiry.
+  // Margin: +300s (5min). Minimum 15 minutes.
+  const SIGNED_TTL_MIN = Math.max(15, Math.ceil((API_TTL_SEC + 300) / 60));
   // allow wider skew window to avoid "Authorization" 403 due to clock drift (overridable by env)
   const SKEW_MIN = Number(process.env.SAS_SKEW_MINUTES ?? 10); // default 10min backdating
   // round seconds to avoid ms-level drift issues
@@ -219,10 +228,10 @@ export async function GET(req: Request) {
       sellDigital: p.sellDigital ?? true,
       sellPanel: p.sellPanel ?? true,
       urls: {
-        original: await getSignedUrl(p.storagePath),
-        thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,
-        large: large ? await getSignedUrl(large.storagePath) : null,
-        watermarked: await getSignedUrl(wmName, 15, "watermarks"),
+        original: await getSignedUrl(p.storagePath, SIGNED_TTL_MIN),
+        thumb: thumb ? await getSignedUrl(thumb.storagePath, SIGNED_TTL_MIN) : null,
+        large: large ? await getSignedUrl(large.storagePath, SIGNED_TTL_MIN) : null,
+        watermarked: await getSignedUrl(wmName, SIGNED_TTL_MIN, "watermarks"),
       },
     };
   }));
@@ -230,12 +239,19 @@ export async function GET(req: Request) {
   return NextResponse.json(
     { items },
     {
-      headers: {
-        // Browser & CDN cache: 10 minutes; allow brief SWR window for smoother UX
-        "Cache-Control": "public, max-age=600, s-maxage=600, stale-while-revalidate=60",
-        // Safety: avoid intermediary confusion (optional but harmless)
-        Vary: "Accept-Encoding",
-      },
+      headers:
+        API_TTL_SEC > 0
+          ? {
+              // Browser & CDN cache (controlled via env for PROD): keep fresh for API_TTL_SEC
+              // Allow brief SWR window for smoother UX
+              "Cache-Control": `public, max-age=${API_TTL_SEC}, s-maxage=${API_TTL_SEC}, stale-while-revalidate=${API_SWR_SEC}`,
+              Vary: "Accept-Encoding",
+            }
+          : {
+              // Dev/default: disable caching to avoid confusion while iterating
+              "Cache-Control": "no-store",
+              Vary: "Accept-Encoding",
+            },
     }
   );
 }

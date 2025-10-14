@@ -106,10 +106,14 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 
 - [x] Lightbox: ウォーターマーク画像の事前生成
   - [x] Upload時に `photos/watermarks/<slug>_wm_2048_v1.jpg` を生成（sharpで合成済み・動作検証済み）
-  - [ ] `/api/wm/[slug]` は存在チェック→あれば302、無ければ生成→保存→302
+  - [x] `/api/wm/[slug]` は存在チェック→あれば302、無ければ生成→保存→302
   - [ ] Blobに `Cache-Control: public, max-age=31536000, immutable` を設定
-  - [ ] ファイル名に `wm` のバージョンを含める（例 `_wm-v2_`）
+  - [x] ファイル名に `wm` のバージョンを含める（例 `_wm-v2_`）
   - メモ: 現状は表示時に生成、Upload時生成は未実装
+  - 更新: `/api/wm/[slug]` とアップロード時の生成フローは `lib/watermark.ts` を使った内部生成に変更済み。BlobのCache-Control設定は未対応。
+  - 追記 (2025-10-14): Upload時の内部生成は `lib/watermark.ts` で実装済み。`/api/wm/[slug]` は存在チェック→未生成なら合成→保存→302 で稼働中。
+  - 注記: 保存先は `watermarks/<slug>_wm_2048_v1.jpg`（`photos/watermarks` ではない）。
+  - TODO: Blob `Cache-Control: public, max-age=31536000, immutable` の設定は未対応（本番適用前に実装）。
 
 - [ ] ランディング: ヒーロー画像最適化
   - [ ] 出力幅: 640/960/1280/1600/1920 を生成（AVIF/WebP優先）
@@ -122,6 +126,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
   - [ ] 初期ロードを12枚に制限、以降“もっと見る”で追加ロード
   - [ ] `rowConstraints.minPhotos: 1`（少枚数でも崩れない）
   - [ ] サムネは480px（DPR2向けに960pxまで許容）
+  - 新規: ギャラリー速度最適化（Suspense、CSRフォールバック、SAS TTL設定）を完了。
 
 - [x] 本番キャッシュ/TTL
   - [x] public画像: CDN長期キャッシュ
@@ -145,7 +150,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] 監視設定の IaC 化（Bicep/Terraform もしくは `az monitor` スクリプト）
 - [ ] ACS 送信ログを Log Analytics に転送し、配信失敗割合のアラートを作成
 - [ ] Stripe Webhook のイベント処理ログに `orderId` / `customerEmail` を必ず含める（PIIは必要最小限）
-- [ ] 本番リリース時に HTTP Header（Content-Security-Policy等）の再検討を行う（現状は開発検証用に緩和中）
+- [ ] 本番リリース時に HTTP Header（Content-Security-Policy等）の再検討を行う（開発環境ではデバッグ用に緩和したCSPを使用しており、本番環境では厳格なCSP、Referrer-Policy、Permissions-Policyを再導入予定）
 
 ## 問い合わせフォーム / メール通知関連
 
