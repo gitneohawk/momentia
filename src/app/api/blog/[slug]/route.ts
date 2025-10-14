@@ -47,8 +47,7 @@ type Params = { params: Promise<{ slug: string }> };
 export async function GET(req: Request, { params }: Params) {
   const { slug } = await params;
   if (!validateSlug(slug)) return NextResponse.json({ error: "invalid slug" }, { status: 400 });
-  const bad = checkHostOrigin(req);
-  if (bad) return bad;
+  // Removed checkHostOrigin for GET requests
   const { ok, resetSec } = await blogLimiter.hit(clientIp(req));
   if (!ok) {
     const r = NextResponse.json({ error: "rate_limited" }, { status: 429 });
