@@ -1,9 +1,69 @@
+// --- security helpers ---
+const MAX_BODY_BYTES = 10 * 1024; // 10KB
+const ALLOWED_HOSTS = new Set([
+  'www.momentia.photo',
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+
+function maskEmail(e: string) {
+  const [u, d] = e.split('@');
+  if (!u || !d) return e;
+  const head = u.slice(0, 1);
+  return `${head}${'*'.repeat(Math.max(1, u.length - 1))}@${d}`;
+}
+
+// very simple in-memory rate limiter per IP (60 req/min)
+const rl = (globalThis as any).__momentiaCheckoutRL || new Map<string, { c: number; reset: number }>();
+(globalThis as any).__momentiaCheckoutRL = rl;
+const WINDOW_MS = 60_000;
+const LIMIT = 60;
+function rateLimit(ip: string): boolean {
+  const now = Date.now();
+  const rec = rl.get(ip);
+  if (!rec || rec.reset < now) {
+    rl.set(ip, { c: 1, reset: now + WINDOW_MS });
+    return true;
+  }
+  if (rec.c >= LIMIT) return false;
+  rec.c += 1;
+  return true;
+}
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getToken } from 'next-auth/jwt';
 
 export async function POST(req: NextRequest) {
   try {
+    // Content-Length upper bound to avoid large payloads
+    const cl = req.headers.get('content-length');
+    if (cl && Number(cl) > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: 'payload too large' }, { status: 413 });
+    }
+
+    // Only accept JSON
+    const ctype = req.headers.get('content-type') || '';
+    if (!ctype.toLowerCase().startsWith('application/json')) {
+      return NextResponse.json({ error: 'invalid content-type' }, { status: 415 });
+    }
+
+    // CSRF-lite: enforce allowed origin/host
+    const origin = (req.headers.get('origin') || '').toLowerCase();
+    const host = (req.headers.get('x-forwarded-host') || req.headers.get('host') || '').toLowerCase();
+    if (!host || !ALLOWED_HOSTS.has(host)) {
+      return NextResponse.json({ error: 'forbidden host' }, { status: 403 });
+    }
+    if (origin && !ALLOWED_HOSTS.has(new URL(origin).host)) {
+      return NextResponse.json({ error: 'forbidden origin' }, { status: 403 });
+    }
+
+    // IP-based rate limit (very lightweight)
+    const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
+    if (!rateLimit(ip)) {
+      const res = NextResponse.json({ error: 'too many requests' }, { status: 429 });
+      res.headers.set('Retry-After', '60');
+      return res;
+    }
+
     const body = await req.json();
     const { itemType, amountJpy, slug, customerEmail } = body;
     let { name } = body;
@@ -49,7 +109,7 @@ export async function POST(req: NextRequest) {
     const allowedRaw = process.env.ALLOWED_CHECKOUT_EMAILS || '';
     const allowed = allowedRaw.split(',').map((s) => s.trim()).filter(Boolean);
     if (allowed.length > 0 && !allowed.includes(email)) {
-      console.warn('[checkout] blocked by ALLOWED_CHECKOUT_EMAILS', { email });
+      console.warn('[checkout] blocked by ALLOWED_CHECKOUT_EMAILS', { email: maskEmail(email) });
       return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     }
 
@@ -61,8 +121,19 @@ export async function POST(req: NextRequest) {
     }
     const stripe = new Stripe(secret);
 
-    const rawBase = process.env.NEXT_PUBLIC_BASE_URL || '';
+    const xfProto = req.headers.get('x-forwarded-proto') || 'https';
+    const xfHost = host; // from above
+    const inferred = xfHost ? `${xfProto}://${xfHost}` : '';
+    const rawBase = (process.env.NEXT_PUBLIC_BASE_URL || inferred || '').trim();
     const baseUrl = rawBase.replace(/\/+$/, '');
+    try {
+      const h = new URL(baseUrl).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(h)) {
+        return NextResponse.json({ error: 'baseUrl mismatch' }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'invalid baseUrl' }, { status: 400 });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

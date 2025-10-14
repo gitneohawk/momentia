@@ -5,10 +5,51 @@ import { PrismaClient } from "@prisma/client";
 import { sendMail } from "@/lib/mailer";
 import { tplOrderDigitalUser, tplOrderPanelUser, tplOrderAdminNotice } from "@/lib/mail-templates";
 
+// --- security helpers / webhook hardening ---
+const MAX_BODY_BYTES_WEBHOOK = 256 * 1024; // 256KB safety cap
+const ALLOWED_HOSTS_WEB = new Set([
+  'www.momentia.photo',
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+
+function maskEmail(e: string | null | undefined) {
+  if (!e) return e as any;
+  const s = String(e);
+  const [u, d] = s.split('@');
+  if (!u || !d) return s;
+  const head = u.slice(0, 1);
+  return `${head}${'*'.repeat(Math.max(1, u.length - 1))}@${d}`;
+}
+
+// Very simple in-memory idempotency guard (per process).
+const seen = (globalThis as any).__momentiaStripeEvents || new Map<string, number>();
+(globalThis as any).__momentiaStripeEvents = seen;
+const SEEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+function alreadyProcessed(eventId: string): boolean {
+  const now = Date.now();
+  // purge old
+  for (const [k, t] of seen) {
+    if (t < now) seen.delete(k);
+  }
+  if (seen.has(eventId)) return true;
+  seen.set(eventId, now + SEEN_TTL_MS);
+  return false;
+}
+
 const prisma = new PrismaClient();
 export const runtime = "nodejs"; // Edge不可: 署名検証に生ボディが必要
 
 export async function POST(req: Request) {
+  // Basic header validations before reading body
+  const cl = req.headers.get('content-length');
+  if (cl && Number(cl) > MAX_BODY_BYTES_WEBHOOK) {
+    return new NextResponse('Payload too large', { status: 413 });
+  }
+  const ctype = (req.headers.get('content-type') || '').toLowerCase();
+  if (ctype && !ctype.startsWith('application/json')) {
+    return new NextResponse('Unsupported Media Type', { status: 415 });
+  }
+
   // 1) 署名ヘッダ & シークレット
   const sig = (await headers()).get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -23,7 +64,7 @@ export async function POST(req: Request) {
   let event: Stripe.Event;
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret, 300); // 5 min tolerance
   } catch (err: any) {
     console.error("[ALERT][STRIPE_WEBHOOK_ERROR][CONSTRUCT_EVENT]", {
       message: String(err),
@@ -33,6 +74,18 @@ export async function POST(req: Request) {
   }
 
   console.info("[STRIPE_WEBHOOK_RECEIVED]", { id: event.id, type: event.type });
+
+  // Drop duplicates (Stripe retries) quickly in-process; DB upsert is a second layer
+  if (alreadyProcessed(event.id)) {
+    console.info('[STRIPE_WEBHOOK_DUPLICATE_IGNORED]', { id: event.id, type: event.type });
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
+  // Allowlist events
+  if (event.type !== 'checkout.session.completed') {
+    console.info('[STRIPE_WEBHOOK_IGNORED]', { id: event.id, type: event.type });
+    return NextResponse.json({ received: true });
+  }
 
   if (event.type === "checkout.session.completed") {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -177,9 +230,19 @@ export async function POST(req: Request) {
     }
 
     // 5) メール送信用の URL を準備
-    const baseUrl =
-      (process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") ||
-        (process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : ""));
+    // Safer base URL inference (prefer env; fallback to WEBSITE_HOSTNAME)
+    const inferred = process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : '';
+    const rawBase = (process.env.NEXT_PUBLIC_BASE_URL || inferred || '').trim();
+    const baseUrl = rawBase.replace(/\/+$/, '');
+    try {
+      const h = new URL(baseUrl).host.toLowerCase();
+      if (!ALLOWED_HOSTS_WEB.has(h)) {
+        console.warn('[STRIPE_WEBHOOK_WARN][BASEURL_MISMATCH]', { host: h });
+        // proceed without URLs to avoid leaking wrong host
+      }
+    } catch {
+      // if invalid, zero-out URLs below
+    }
     const _invoiceUrl =
       invoiceTokenId && baseUrl ? `${baseUrl}/api/invoice?token=${invoiceTokenId}` : "";
     const _downloadUrl =
@@ -218,7 +281,7 @@ export async function POST(req: Request) {
         console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
           orderId: full.id,
           itemType,
-          to: email,
+          to: maskEmail(email),
           accessTokenId,
         });
 
@@ -254,7 +317,7 @@ export async function POST(req: Request) {
           console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
             orderId: full.id,
             itemType,
-            to: adminTo,
+            to: maskEmail(adminTo),
             invoiceUrl: _invoiceUrl,
           });
         }
@@ -286,7 +349,7 @@ export async function POST(req: Request) {
         console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
           orderId: full.id,
           itemType,
-          to: email,
+          to: maskEmail(email),
         });
 
         if (_invoiceUrl) {
@@ -321,7 +384,7 @@ export async function POST(req: Request) {
           console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
             orderId: full.id,
             itemType,
-            to: adminTo,
+            to: maskEmail(adminTo),
             invoiceUrl: _invoiceUrl,
           });
         }
@@ -334,8 +397,6 @@ export async function POST(req: Request) {
         error: String(mailErr),
       });
     }
-  } else {
-    console.info("[STRIPE_WEBHOOK_IGNORED]", { id: event.id, type: event.type });
   }
 
   return NextResponse.json({ received: true });

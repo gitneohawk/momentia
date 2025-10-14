@@ -14,7 +14,7 @@
 - ✅ Azure への自動デプロイのための CI/CD パイプラインの確立。
 - ✅ コアコンポーネントと API エンドポイントの単体テスト作成。
 - ✅ Azure Container Apps へのデプロイ。
-- カスタムドメイン（momentia.evoluzio.com）の設定（優先度高）。
+- ✅ カスタムドメイン（www.momentia.photo）の設定完了。
 - ブログ画像アップロード用の別の Blob コンテナの有効化。
 - ✅ MVP 購入フローの Stripe Checkout（ホスト型ページ）対応完了。単一アイテムの「今すぐ購入」から開始し、後にカート機能拡張予定。
 - ✅ 注文ステータス管理の実装完了。
@@ -61,7 +61,10 @@
 1. **Entra ID リダイレクト URI**
    - 本番 URL を追加：
      ```
-     https://momentia.evoluzio.com/api/auth/callback/azure-ad
+     https://www.momentia.photo/api/auth/callback/azure-ad
+     ```
+   - ステージング（必要な場合）：
+     ```
      https://momentia.delightfulisland-cc05cb09.japaneast.azurecontainerapps.io/api/auth/callback/azure-ad
      ```
    - ローカル開発用 URI は維持：
@@ -104,4 +107,4 @@
 
 _このチェックリストはスムーズなデプロイを支援し、設定ミスを最小限に抑えます。_
 
-_最終更新日: 2025-09-19_
+_最終更新日: 2025-10-14_
