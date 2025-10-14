@@ -5,9 +5,57 @@ import { BlobServiceClient } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
 import sharp from "sharp";
 import crypto from "crypto";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// --- security: allowlist hosts & rate limit ---
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+const wmLimiter = createRateLimiter({ prefix: "wm", limit: 120, windowMs: 60_000 });
+
+function clientIp(req: Request): string {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+}
+function checkHostOrigin(req: Request) {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  const origin = (req.headers.get("origin") || "").toLowerCase();
+  if (origin) {
+    try {
+      const oh = new URL(origin).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(oh)) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+      }
+    } catch {
+      return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+  }
+  return null as Response | null;
+}
+
+// width buckets to improve cache hit ratio
+const VALID_WIDTHS = [512, 1024, 1536, 2048, 3072, 4096] as const;
+function coerceWidth(n: number): number {
+  const clamped = Math.max(320, Math.min(4096, Math.floor(n || 0)));
+  // pick the smallest bucket >= requested, else the largest
+  for (const w of VALID_WIDTHS) {
+    if (clamped <= w) return w;
+  }
+  return VALID_WIDTHS[VALID_WIDTHS.length - 1];
+}
+
+function validateSlugStrict(s: string): boolean {
+  if (!s) return false;
+  if (s.length > 100) return false;
+  if (/[\\/]/.test(s)) return false;
+  return /^[a-z0-9-]+$/.test(s);
+}
 
 // Debug switch: enable by calling /api/wm/[slug]?debug=1
 const DEBUG_QUERY_KEY = "debug";
@@ -149,7 +197,22 @@ export async function GET(
   log("request start", { url: url.pathname + url.search });
 
   try {
+    // --- security preflight: host/origin, rate limit ---
+    const bad = checkHostOrigin(_req);
+    if (bad) return bad;
+    {
+      const { ok, resetSec } = await wmLimiter.hit(clientIp(_req));
+      if (!ok) {
+        const r = NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Cache-Control": "no-store" } });
+        r.headers.set("Retry-After", String(resetSec));
+        return r;
+      }
+    }
+
     const { slug } = context.params as { slug: string };
+    if (!validateSlugStrict(slug)) {
+      return NextResponse.json({ error: "Bad Request" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
 
     log("slug", slug);
 
@@ -159,15 +222,14 @@ export async function GET(
       include: { variants: true },
     });
     log("photo found?", Boolean(photo), photo ? { id: photo.id, storagePath: photo.storagePath, variants: photo.variants?.map(v => ({ type: v.type, path: v.storagePath })) } : {});
-    if (!photo) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!photo) return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
 
     const large = photo.variants.find((v) => v.type === "large");
     const sourcePath = (large?.storagePath ?? photo.storagePath); // large 無ければオリジナル
     log("sourcePath", sourcePath, "chosenVariant", large ? "large" : "original");
 
     const qWidth = parseInt(url.searchParams.get("w") ?? "2048", 10);
-    const widthReq = isNaN(qWidth) ? 2048 : qWidth;
-    const widthOut = Math.min(4096, Math.max(320, widthReq));
+    const widthOut = coerceWidth(isNaN(qWidth) ? 2048 : qWidth);
     const noWm = url.searchParams.get("nowm") === "1" || url.searchParams.get("wm") === "0";
     const refresh = url.searchParams.get("refresh") === "1";
     const _generate = url.searchParams.get("generate") === "1"; // 生成を強制（未使用でもtrueで同じ）
@@ -279,8 +341,8 @@ export async function GET(
     console.error("wm error:", e?.message || e);
     // Emit a compact diagnostic into response when debug=1 (non-binary)
     if (typeof url !== "undefined" && (url.searchParams.get(DEBUG_QUERY_KEY) === "1" || url.searchParams.get(DEBUG_QUERY_KEY) === "true")) {
-      return NextResponse.json({ error: "wm-failed", msg: String(e?.message || e) }, { status: 500 });
+      return NextResponse.json({ error: "wm-failed", msg: String(e?.message || e) }, { status: 500, headers: { "Cache-Control": "no-store" } });
     }
-    return NextResponse.json({ error: "wm-failed" }, { status: 500 });
+    return NextResponse.json({ error: "wm-failed" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

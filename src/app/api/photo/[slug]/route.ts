@@ -2,9 +2,44 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+const photoBySlugLimiter = createRateLimiter({ prefix: "photo:slug", limit: 120, windowMs: 60_000 });
+
+function clientIp(req: Request): string {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+}
+
+function checkHostOrigin(req: Request) {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  const origin = (req.headers.get("origin") || "").toLowerCase();
+  if (origin) {
+    try {
+      const oh = new URL(origin).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(oh)) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+      }
+    } catch {
+      return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+  }
+  return null as Response | null;
+}
+
+function validateSlug(slug?: string): boolean {
+  if (!slug) return false;
+  return /^[a-z0-9-]{1,120}$/.test(slug);
+}
 
 type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }> & {
   sellDigital?: boolean | null;
@@ -19,17 +54,28 @@ function blobBaseFromConn(conn?: string) {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug } = await ctx.params;
+    if (!validateSlug(slug)) {
+      return NextResponse.json({ error: "Bad Request" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
+    const bad = checkHostOrigin(req);
+    if (bad) return bad;
+    const { ok, resetSec } = await photoBySlugLimiter.hit(clientIp(req));
+    if (!ok) {
+      const r = NextResponse.json({ error: "rate_limited" }, { status: 429 });
+      r.headers.set("Retry-After", String(resetSec));
+      return r;
+    }
     const p: PhotoWithRels | null = await prisma.photo.findUnique({
       where: { slug },
       include: { variants: true, keywords: true },
     });
     if (!p || !p.published) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
     }
 
     const base = blobBaseFromConn(process.env.AZURE_STORAGE_CONNECTION_STRING);
@@ -63,6 +109,6 @@ export async function GET(
       }
     );
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

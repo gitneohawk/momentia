@@ -12,25 +12,13 @@ function maskEmail(e: string) {
   return `${head}${'*'.repeat(Math.max(1, u.length - 1))}@${d}`;
 }
 
-// very simple in-memory rate limiter per IP (60 req/min)
-const rl = (globalThis as any).__momentiaCheckoutRL || new Map<string, { c: number; reset: number }>();
-(globalThis as any).__momentiaCheckoutRL = rl;
-const WINDOW_MS = 60_000;
-const LIMIT = 60;
-function rateLimit(ip: string): boolean {
-  const now = Date.now();
-  const rec = rl.get(ip);
-  if (!rec || rec.reset < now) {
-    rl.set(ip, { c: 1, reset: now + WINDOW_MS });
-    return true;
-  }
-  if (rec.c >= LIMIT) return false;
-  rec.c += 1;
-  return true;
-}
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getToken } from 'next-auth/jwt';
+
+import { createRateLimiter } from '@/lib/rate-limit';
+
+const checkoutLimiter = createRateLimiter({ prefix: 'checkout', limit: 60, windowMs: 60_000 });
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,11 +44,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'forbidden origin' }, { status: 403 });
     }
 
-    // IP-based rate limit (very lightweight)
+    // IP-based rate limit (shared limiter)
     const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
-    if (!rateLimit(ip)) {
+    const { ok, resetSec } = await checkoutLimiter.hit(ip);
+    if (!ok) {
       const res = NextResponse.json({ error: 'too many requests' }, { status: 429 });
-      res.headers.set('Retry-After', '60');
+      res.headers.set('Retry-After', String(resetSec));
       return res;
     }
 

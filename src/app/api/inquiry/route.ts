@@ -4,6 +4,21 @@ import { prisma } from "@/lib/prisma"; // 既存のPrisma helperがあればそ�
 import xss from "xss"; // if not installed, keep fallback sanitizer below
 import { sendMail } from "@/lib/mailer";
 import { tplInquiryAutoReply, tplInquiryAdminNotice } from "@/lib/mail-templates";
+import { createRateLimiter } from "@/lib/rate-limit";
+
+const MAX_BODY_BYTES = 16 * 1024; // 16KB body cap
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+
+function maskEmail(e: string) {
+  const [u, d] = e.split("@");
+  if (!u || !d) return e;
+  return `${u.slice(0, 1)}${"*".repeat(Math.max(1, u.length - 1))}@${d}`;
+}
+
+const inquiryLimiter = createRateLimiter({ prefix: "inquiry", limit: 8, windowMs: 10 * 60 * 1000 });
 
 const headerSafe = (s: string) => !/[\r\n]/.test(s); // prevent header injection
 
@@ -35,26 +50,7 @@ const schema = z.object({
 });
 
 // --- Simple in-process rate limiter (per IP) ---
-const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const MAX_REQ = 8; // max requests per window
-type Bucket = { count: number; resetAt: number };
-const buckets: Map<string, Bucket> = (globalThis as any).__inqBuckets ?? new Map();
-(globalThis as any).__inqBuckets = buckets;
-
-function rateLimit(ip: string): { ok: boolean; resetAt: number } {
-  const now = Date.now();
-  const b = buckets.get(ip);
-  if (!b || now > b.resetAt) {
-    const resetAt = now + WINDOW_MS;
-    buckets.set(ip, { count: 1, resetAt });
-    return { ok: true, resetAt };
-  }
-  if (b.count < MAX_REQ) {
-    b.count++;
-    return { ok: true, resetAt: b.resetAt };
-  }
-  return { ok: false, resetAt: b.resetAt };
-}
+// Removed per instructions
 
 // --- Sanitizers ---
 const sanitize = (s: string) => xss(s, {
@@ -65,6 +61,15 @@ const sanitize = (s: string) => xss(s, {
 
 export async function POST(req: Request) {
   try {
+    // Content-Length upper bound to protect parsing
+    const cl = req.headers.get("content-length");
+    if (cl && Number(cl) > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { ok: false },
+        { status: 413, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } }
+      );
+    }
+
     // Basic Content-Type guard
     const contentType = req.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
@@ -74,25 +79,42 @@ export async function POST(req: Request) {
       );
     }
 
-    // Optional same-origin check (skip in dev if no env set)
-    const allowedOrigin = process.env.NEXT_PUBLIC_BASE_URL; // e.g., https://momentia.evoluzio.com
-    const origin = req.headers.get("origin");
-    if (allowedOrigin && origin && origin !== allowedOrigin) {
+    // Strict host/origin checks
+    const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+    if (!host || !ALLOWED_HOSTS.has(host)) {
       return NextResponse.json(
         { ok: false },
         { status: 403, headers: { "Cache-Control": "no-store" } }
       );
     }
+    const origin = (req.headers.get("origin") || "").toLowerCase();
+    if (origin) {
+      try {
+        const oh = new URL(origin).host.toLowerCase();
+        if (!ALLOWED_HOSTS.has(oh)) {
+          return NextResponse.json(
+            { ok: false },
+            { status: 403, headers: { "Cache-Control": "no-store" } }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { ok: false },
+          { status: 403, headers: { "Cache-Control": "no-store" } }
+        );
+      }
+    }
 
+    // Rate limit (shared limiter)
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || (req as any).ip || "";
-    const rl = rateLimit(ip);
-    if (!rl.ok) {
+    const { ok: allowed, resetSec } = await inquiryLimiter.hit(ip || "unknown");
+    if (!allowed) {
       return NextResponse.json(
         { ok: false, reason: "rate_limited" },
         {
           status: 429,
           headers: {
-            "Retry-After": Math.ceil((rl.resetAt - Date.now()) / 1000).toString(),
+            "Retry-After": String(resetSec),
             "Cache-Control": "no-store",
           },
         }
@@ -137,7 +159,7 @@ export async function POST(req: Request) {
         html: auto.html,
       });
       autoReplySuccess = true;
-      console.info("[inquiry mail] auto-reply sent to user:", saved.email);
+      console.info("[inquiry mail] auto-reply sent to user:", maskEmail(saved.email));
     } catch (err) {
       autoReplySuccess = false;
       autoReplyError = err;
@@ -164,7 +186,7 @@ export async function POST(req: Request) {
         html: admin.html + statusLineHtml,
       });
 
-      console.info("[inquiry mail] admin notice sent. Auto-reply status:", autoReplySuccess ? "succeeded" : "failed");
+      console.info("[inquiry mail] admin notice sent", { result: autoReplySuccess ? "succeeded" : "failed", user: maskEmail(saved.email) });
     } catch (err) {
       console.error("[inquiry mail error] admin notice failed:", err, "Auto-reply status:", autoReplySuccess ? "succeeded" : "failed");
     }

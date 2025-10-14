@@ -1,3 +1,18 @@
+// --- security helpers for download ---
+const MAX_TOKEN_LEN = 128;
+const MIN_TOKEN_LEN = 16;
+// allow cuid/cuid2/hex/base64url-ish tokens (legacy含む)。UUIDのハイフンも許容
+const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+const DEFAULT_SIZES = (process.env.DOWNLOAD_SIZES || '1024,2048')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function sanitizeFilenamePart(s: string) {
+  // CR/LFや危険文字を除去し、スペース→アンダースコア
+  return s.replace(/[\r\n]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 100);
+}
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -5,6 +20,9 @@ import {
   StorageSharedKeyCredential,
   generateBlobSASQueryParameters,
 } from "@azure/storage-blob";
+
+import { createRateLimiter } from "@/lib/rate-limit";
+const downloadLimiter = createRateLimiter({ prefix: "download", limit: 60, windowMs: 60_000 });
 
 /**
  * Read storage credentials from env. We prefer explicit account + key,
@@ -81,18 +99,33 @@ async function resolveDigitalOrderByToken(token: string) {
 // GET /api/download?token=xxxx[&size=2048]
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token");
-  const size = searchParams.get("size") || process.env.DOWNLOAD_SIZE || "2048"; // default 2048px variant
+  const token = searchParams.get('token');
+  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
+  const { ok, resetSec } = await downloadLimiter.hit(ip);
+  if (!ok) {
+    const r = NextResponse.json({ error: 'リクエストが多すぎます。' }, { status: 429 });
+    r.headers.set('Retry-After', String(resetSec));
+    return r;
+  }
 
   if (!token) {
-    return NextResponse.json({ error: "トークンが指定されていません。" }, { status: 400 });
+    return NextResponse.json({ error: 'トークンが指定されていません。' }, { status: 400 });
   }
+  if (token.length < MIN_TOKEN_LEN || token.length > MAX_TOKEN_LEN || !TOKEN_RE.test(token)) {
+    return NextResponse.json({ error: '不正なトークン形式です。' }, { status: 400 });
+  }
+
+  const reqSize = searchParams.get('size');
+  const size = (reqSize && DEFAULT_SIZES.includes(reqSize))
+    ? reqSize
+    : (process.env.DOWNLOAD_SIZE || '2048');
 
   // Resolve order (AccessToken → legacy fallback)
   const resolved = await resolveDigitalOrderByToken(token);
 
   if (!resolved.order) {
-    return NextResponse.json({ error: "無効または期限切れのトークンです。" }, { status: 404 });
+    const status = resolved.accessTokenId ? 410 : 404; // AccessTokenが存在するが無効→410 Gone
+    return NextResponse.json({ error: '無効または期限切れのトークンです。' }, { status });
   }
 
   const order = resolved.order;
@@ -112,6 +145,9 @@ export async function GET(req: NextRequest) {
 
   // 例: public/tulips_2048.jpg
   const blobName = `${basePath}/${order.slug}${suffix}.jpg`;
+  const safeSlug = sanitizeFilenamePart(order.slug);
+  const safeSuffix = sanitizeFilenamePart(suffix);
+  const downloadName = `${safeSlug}${safeSuffix}.jpg`;
 
   // Debug logging (redacted)
   console.log("[download] env", {
@@ -142,8 +178,8 @@ export async function GET(req: NextRequest) {
       permissions: BlobSASPermissions.parse("r"),
       startsOn: new Date(),
       expiresOn: new Date(Date.now() + 15 * 60 * 1000), // 15分
-      contentDisposition: `attachment; filename="${order.slug}${suffix}.jpg"`,
-      contentType: "image/jpeg",
+      contentDisposition: `attachment; filename="${downloadName}"`,
+      contentType: 'image/jpeg',
     } as const;
 
     const sasToken = generateBlobSASQueryParameters(
@@ -168,7 +204,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.redirect(blobUrl);
+    const res = NextResponse.redirect(blobUrl);
+    res.headers.set('Cache-Control', 'no-store');
+    res.headers.set('Pragma', 'no-cache');
+    return res;
   } catch (e) {
     console.error("[download] failed to generate SAS", e);
     return NextResponse.json(

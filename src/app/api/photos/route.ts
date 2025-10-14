@@ -8,6 +8,7 @@ import {
   BlobServiceClient,
 } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 function mask(s?: string | null, showPrefix = 3) {
   if (!s) return "(none)";
@@ -17,6 +18,35 @@ function mask(s?: string | null, showPrefix = 3) {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const photosLimiter = createRateLimiter({ prefix: "photos:list", limit: 120, windowMs: 60_000 });
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+
+function clientIp(req: Request): string {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+}
+
+function checkHostOrigin(req: Request) {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  const origin = (req.headers.get("origin") || "").toLowerCase();
+  if (origin) {
+    try {
+      const oh = new URL(origin).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(oh)) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+      }
+    } catch {
+      return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+  }
+  return null as Response | null;
+}
 
 // Cache TTL (API response) can be tuned by env. In dev, default to no-store.
 const API_TTL_SEC =
@@ -81,9 +111,21 @@ const logInfo = (...args: any[]) => {
 
 export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
-  const q = searchParams.get("q")?.trim();
-  const kw = searchParams.get("keyword")?.trim();
-  const limit = Math.min(Number(searchParams.get("limit") ?? 100), 200);
+  const bad = checkHostOrigin(req);
+  if (bad) return bad;
+
+  const ip = clientIp(req);
+  const { ok, resetSec } = await photosLimiter.hit(ip);
+  if (!ok) {
+    const r = NextResponse.json({ error: "rate_limited" }, { status: 429 });
+    r.headers.set("Retry-After", String(resetSec));
+    return r;
+  }
+
+  const rawLimit = Number(searchParams.get("limit") ?? 100);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 100;
+  const q = (searchParams.get("q")?.trim() || '').slice(0, 120);
+  const kw = (searchParams.get("keyword")?.trim() || '').slice(0, 64);
 
   const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
   const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1] ?? null;
@@ -213,7 +255,8 @@ export async function GET(req: Request) {
       take: limit,
     });
   } catch (err) {
-    console.error("Error occurred:", err); // エラー内容をログに出力
+    console.error("Error occurred:", err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const items = await Promise.all(photos.map(async (p) => {

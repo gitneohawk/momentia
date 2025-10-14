@@ -10,6 +10,43 @@ import { authOptions, isAdminEmail } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+import { createRateLimiter } from "@/lib/rate-limit";
+
+const ADMIN_BLOG_LIMITER = createRateLimiter({ prefix: "admin:blog", limit: 30, windowMs: 60_000 }); // 30 req/min per IP
+const MAX_JSON_BYTES = 64 * 1024; // 64KB
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+
+function clientIp(req: Request): string {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+}
+
+function checkHostOrigin(req: Request): Response | null {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    return new NextResponse(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  }
+  const origin = (req.headers.get("origin") || "").toLowerCase();
+  if (origin) {
+    try {
+      const oh = new URL(origin).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(oh)) {
+        return new NextResponse(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      }
+    } catch {
+      return new NextResponse(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    }
+  }
+  return null;
+}
+
+function validateSlug(slug?: string): boolean {
+  if (!slug) return false;
+  return /^[a-z0-9-]{1,120}$/.test(slug);
+}
+
 async function assertAdmin() {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? "";
@@ -18,12 +55,16 @@ async function assertAdmin() {
 
 // GET /api/admin/blog/[slug]
 export async function GET(
-  _req: Request,
+  req: Request,
   context: any
 ) {
   const { slug } = (context?.params ?? {}) as { slug?: string };
+  const bad = checkHostOrigin(req);
+  if (bad) return bad;
+  const { ok, resetSec } = await ADMIN_BLOG_LIMITER.hit(clientIp(req));
+  if (!ok) return new NextResponse(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { "Content-Type": "application/json", "Retry-After": String(resetSec) } });
+  if (!validateSlug(slug)) return NextResponse.json({ error: "Missing or invalid slug" }, { status: 400 });
   if (!(await assertAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   try {
     const post = await prisma.post.findUnique({ where: { slug } });
@@ -40,8 +81,20 @@ export async function PUT(
   context: any
 ) {
   const { slug } = (context?.params ?? {}) as { slug?: string };
+  if (!validateSlug(slug)) return NextResponse.json({ error: "Missing or invalid slug" }, { status: 400 });
+  const cl = req.headers.get("content-length");
+  if (cl && Number(cl) > MAX_JSON_BYTES) {
+    return NextResponse.json({ error: "payload too large" }, { status: 413 });
+  }
+  const ctype = (req.headers.get("content-type") || "").toLowerCase();
+  if (!ctype.startsWith("application/json")) {
+    return NextResponse.json({ error: "invalid content-type" }, { status: 415 });
+  }
+  const bad = checkHostOrigin(req);
+  if (bad) return bad;
+  const { ok, resetSec } = await ADMIN_BLOG_LIMITER.hit(clientIp(req));
+  if (!ok) return new NextResponse(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { "Content-Type": "application/json", "Retry-After": String(resetSec) } });
   if (!(await assertAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   let data: any;
   try {
@@ -84,17 +137,33 @@ export async function PATCH(
   context: any
 ) {
   if (!(await assertAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const cl = req.headers.get("content-length");
+  if (cl && Number(cl) > MAX_JSON_BYTES) {
+    return NextResponse.json({ error: "payload too large" }, { status: 413 });
+  }
+  const ctype = (req.headers.get("content-type") || "").toLowerCase();
+  if (!ctype.startsWith("application/json")) {
+    return NextResponse.json({ error: "invalid content-type" }, { status: 415 });
+  }
+  const bad = checkHostOrigin(req);
+  if (bad) return bad;
+  const { ok, resetSec } = await ADMIN_BLOG_LIMITER.hit(clientIp(req));
+  if (!ok) return new NextResponse(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { "Content-Type": "application/json", "Retry-After": String(resetSec) } });
   return PUT(req, context);
 }
 
 // DELETE /api/admin/blog/[slug]
 export async function DELETE(
-  _req: Request,
+  req: Request,
   context: any
 ) {
   const { slug } = (context?.params ?? {}) as { slug?: string };
+  const bad = checkHostOrigin(req);
+  if (bad) return bad;
+  const { ok, resetSec } = await ADMIN_BLOG_LIMITER.hit(clientIp(req));
+  if (!ok) return new NextResponse(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { "Content-Type": "application/json", "Retry-After": String(resetSec) } });
+  if (!validateSlug(slug)) return NextResponse.json({ error: "Missing or invalid slug" }, { status: 400 });
   if (!(await assertAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
   try {
     const deleted = await prisma.post.delete({ where: { slug } });

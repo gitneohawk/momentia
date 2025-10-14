@@ -3,7 +3,7 @@
 // These templates only return subject/text/html bodies.
 
 // Configurable brand constants (pick from env with safe fallbacks)
-const SITE_URL = (process.env.NEXT_PUBLIC_BASE_URL ?? "https://momentia.evoluzio.com").replace(/\/+$/,"");
+const SITE_URL = (process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.momentia.photo").replace(/\/+$/,"");
 const CONTACT_EMAIL = process.env.MAIL_REPLY_TO ?? "info@evoluzio.com";
 
 const fmtJPY = (n: number) =>

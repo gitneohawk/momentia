@@ -11,9 +11,39 @@ import {
   StorageSharedKeyCredential,
 } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+const adminPhotosLimiter = createRateLimiter({ prefix: "admin:photos", limit: 60, windowMs: 60_000 });
+
+function clientIp(req: Request): string {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+}
+
+function checkHostOrigin(req: Request) {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  const origin = (req.headers.get("origin") || "").toLowerCase();
+  if (origin) {
+    try {
+      const oh = new URL(origin).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(oh)) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+      }
+    } catch {
+      return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+  }
+  return null as Response | null;
+}
 
 const ACCOUNT = process.env.AZURE_STORAGE_ACCOUNT || "";
 const CONTAINER = "photos";
@@ -108,7 +138,7 @@ async function getSignedUrl(storagePath: string, ttlMinutes = 60): Promise<strin
   return `${publicBase}/${CONTAINER}/${encodeURI(storagePath)}?${sas}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email) {
@@ -116,6 +146,14 @@ export async function GET() {
   }
   if (!isAdminEmail(email)) {
     return new NextResponse("Forbidden", { status: 403 });
+  }
+  const bad = checkHostOrigin(req);
+  if (bad) return bad;
+  const { ok, resetSec } = await adminPhotosLimiter.hit(clientIp(req));
+  if (!ok) {
+    const r = NextResponse.json({ error: "rate_limited" }, { status: 429 });
+    r.headers.set("Retry-After", String(resetSec));
+    return r;
   }
   try {
     const photos = (await prisma.photo.findMany({

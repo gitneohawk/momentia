@@ -5,8 +5,43 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+const invoiceLimiter = createRateLimiter({ prefix: "invoice", limit: 30, windowMs: 60_000 });
+
+function clientIp(req: Request): string {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+}
+
+function checkHostOrigin(req: Request) {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    return NextResponse.json({ error: "forbidden host" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  const origin = (req.headers.get("origin") || "").toLowerCase();
+  if (origin) {
+    try {
+      const oh = new URL(origin).host.toLowerCase();
+      if (!ALLOWED_HOSTS.has(oh)) {
+        return NextResponse.json({ error: "forbidden origin" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+      }
+    } catch {
+      return NextResponse.json({ error: "forbidden origin" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+  }
+  return null as Response | null;
+}
+
+function validateToken(token?: string): boolean {
+  if (!token) return false;
+  return /^[A-Za-z0-9_-]{16,128}$/.test(token);
+}
 
 // ---- Company info (static) ----
 const COMPANY = {
@@ -17,7 +52,7 @@ const COMPANY = {
 };
 
 function bad(status: number, msg: string) {
-  return NextResponse.json({ error: msg }, { status });
+  return NextResponse.json({ error: msg }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 function renderHtml(params: { orderId: string; issuedAt: Date }) {
@@ -69,23 +104,35 @@ function renderHtml(params: { orderId: string; issuedAt: Date }) {
 }
 
 export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get("token");
-  if (!token) return bad(400, "token が必要です。");
+  const badResp = checkHostOrigin(req);
+  if (badResp) return badResp;
+
+  const ip = clientIp(req);
+  const { ok, resetSec } = await invoiceLimiter.hit(ip);
+  if (!ok) {
+    const r = NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Cache-Control": "no-store" } });
+    r.headers.set("Retry-After", String(resetSec));
+    return r;
+  }
+
+  const token = req.nextUrl.searchParams.get("token") ?? undefined;
+  if (!validateToken(token)) return bad(400, "不正なトークン形式です。");
+  const tokenStr = token as string; // validated above
 
   // 1) 取得（注文メタは必要最小限）
   const t = await prisma.accessToken.findFirst({
-    where: { id: token, kind: "invoice" },
+    where: { id: tokenStr, kind: "invoice" },
     select: {
       id: true,
+      orderId: true,
       used: true,
       maxUses: true,
       expiresAt: true,
       revoked: true,
-      order: { select: { id: true } },
     },
   });
 
-  if (!t || !t.order) return bad(404, "無効または期限切れのトークンです。");
+  if (!t || !t.orderId) return bad(404, "無効または期限切れのトークンです。");
   if (t.revoked) return bad(410, "このトークンは無効化されています。");
   if (t.expiresAt && t.expiresAt < new Date()) return bad(410, "このトークンは期限切れです。");
   if (t.used >= t.maxUses) return bad(429, "ダウンロード回数の上限に達しました。");
@@ -93,7 +140,7 @@ export async function GET(req: NextRequest) {
   // 2) 競合に強い加算（条件付き updateMany）
   const updated = await prisma.accessToken.updateMany({
     where: {
-      id: token,
+      id: tokenStr,
       kind: "invoice",
       revoked: false,
       // 未使用余地 & 未失効を二重チェック
@@ -111,12 +158,13 @@ export async function GET(req: NextRequest) {
   }
 
   // 3) いまは HTML を返す（将来 PDF に置換可）
-  const html = renderHtml({ orderId: t.order.id, issuedAt: new Date() });
+  const html = renderHtml({ orderId: t.orderId, issuedAt: new Date() });
   return new NextResponse(html, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
+      "Content-Disposition": "inline; filename=invoice.html",
     },
   });
 }

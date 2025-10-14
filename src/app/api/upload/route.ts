@@ -6,9 +6,30 @@ import { DefaultAzureCredential } from "@azure/identity";
 import sharp from "sharp";
 import * as exifr from "exifr";
 import { generateWatermark } from "@/lib/watermark";
+import { getToken } from "next-auth/jwt";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";       // sharp を使うため Node 実行
 export const dynamic = "force-dynamic"; // 開発中はキャッシュ無効でOK
+
+// --- security constants ---
+const MAX_UPLOAD_BYTES = 30 * 1024 * 1024; // 30MB
+const ALLOWED_HOSTS = new Set([
+  "www.momentia.photo",
+  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
+]);
+const MIME_ALLOW = new Set(["image/jpeg", "image/png", "image/heic", "image/heif"]);
+
+const uploadLimiter = createRateLimiter({ prefix: "upload", limit: 10, windowMs: 10 * 60_000 }); // 10 req / 10min per IP
+
+function stripGps(exif: any) {
+  if (!exif || typeof exif !== "object") return exif;
+  const o = { ...exif };
+  for (const k of Object.keys(o)) {
+    if (/^gps/i.test(k)) delete (o as any)[k];
+  }
+  return o;
+}
 
 const CONTAINER_NAME = "photos";
 const ORIG_PREFIX = "originals/";
@@ -112,12 +133,61 @@ function slugify(input: string): string {
 
 export async function POST(req: Request) {
   try {
+    // Preflight: size limit (protect memory) using Content-Length if provided
+    const cl = req.headers.get("content-length");
+    if (cl && Number(cl) > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: "file too large" }, { status: 413 });
+    }
+
+    // Only accept multipart/form-data
+    const ctype = (req.headers.get("content-type") || "").toLowerCase();
+    if (!ctype.startsWith("multipart/form-data")) {
+      return NextResponse.json({ error: "invalid content-type" }, { status: 415 });
+    }
+
+    // Host / Origin checks (basic CSRF mitigation for admin-only endpoint)
+    const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+    if (!host || !ALLOWED_HOSTS.has(host)) {
+      return NextResponse.json({ error: "forbidden host" }, { status: 403 });
+    }
+    const origin = (req.headers.get("origin") || "").toLowerCase();
+    if (origin) {
+      try {
+        const oh = new URL(origin).host.toLowerCase();
+        if (!ALLOWED_HOSTS.has(oh)) {
+          return NextResponse.json({ error: "forbidden origin" }, { status: 403 });
+        }
+      } catch {
+        return NextResponse.json({ error: "forbidden origin" }, { status: 403 });
+      }
+    }
+
+    // Rate limit per IP
+    const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+    const { ok, resetSec } = await uploadLimiter.hit(ip);
+    if (!ok) {
+      const r = NextResponse.json({ error: "too many requests" }, { status: 429 });
+      r.headers.set("Retry-After", String(resetSec));
+      return r;
+    }
+
+    // Require authenticated admin (NextAuth via Entra ID)
+    const token = await getToken({ req: req as any });
+    if (!token) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const form = await req.formData();
     const wantWm = (form.get("wm") === "1" || form.get("wm") === "true");
     const publishNow = (form.get("publish") === "1" || form.get("publish") === "true");
     const file = form.get("file");
     if (!file || typeof file === "string") {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
+    }
+
+    const f = file as File;
+    if (!MIME_ALLOW.has((f.type || "").toLowerCase())) {
+      return NextResponse.json({ error: "unsupported file type" }, { status: 415 });
     }
 
     const arrayBuffer = await (file as File).arrayBuffer();
@@ -183,7 +253,7 @@ export async function POST(req: Request) {
         capturedAt: (exifData as any)?.DateTimeOriginal
           ? new Date((exifData as any).DateTimeOriginal)
           : ((exifData as any)?.CreateDate ? new Date((exifData as any).CreateDate) : null),
-        exifRaw: exifData || {},
+        exifRaw: stripGps(exifData) || {},
         published: publishNow, // フォーム指定があれば即公開
       },
     });
