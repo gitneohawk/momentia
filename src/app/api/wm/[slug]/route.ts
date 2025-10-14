@@ -202,9 +202,7 @@ export async function GET(
   log("request start", { url: url.pathname + url.search });
 
   try {
-    // --- security preflight: host/origin, rate limit ---
-    const bad = checkHostOrigin(_req);
-    if (bad) return bad;
+    // --- security preflight: rate limit only (Host/Origin not enforced for public GET) ---
     {
       const { ok, resetSec } = await wmLimiter.hit(clientIp(_req));
       if (!ok) {

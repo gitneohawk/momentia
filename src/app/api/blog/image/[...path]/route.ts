@@ -52,8 +52,6 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const bad = checkHostOrigin(req);
-    if (bad) return bad;
 
     const ip = clientIp(req);
     const { ok, resetSec } = await blogImageLimiter.hit(ip);
