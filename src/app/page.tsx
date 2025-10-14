@@ -4,6 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import Head from "next/head";
 // import ComingSoon from "@/components/ComingSoon";
 
 // アニメーションライブラリのインポート
@@ -25,22 +26,41 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      // APIからおすすめの写真を取得
-      let res = await fetch("/api/photos?featured=1&limit=3", { cache: "no-store" });
-      let json = await res.json();
-      let items: Item[] = json.items ?? [];
-      // おすすめ写真がない場合は、最新の写真を3枚取得
-      if (!items.length) {
-        res = await fetch("/api/photos?limit=3", { cache: "no-store" });
-        json = await res.json();
-        items = json.items ?? [];
+      // API を並列フェッチ（どちらかが失敗しても片方を使う）
+      const [featResult, recentResult] = await Promise.allSettled([
+        fetch("/api/photos?featured=1&limit=3", { cache: "force-cache" }),
+        fetch("/api/photos?limit=3", { cache: "force-cache" }),
+      ]);
+
+      let items: Item[] = [];
+
+      if (featResult.status === "fulfilled") {
+        try {
+          const json = await featResult.value.json();
+          if (Array.isArray(json.items) && json.items.length > 0) {
+            items = json.items as Item[];
+          }
+        } catch {}
       }
+
+      if (items.length === 0 && recentResult.status === "fulfilled") {
+        try {
+          const json = await recentResult.value.json();
+          if (Array.isArray(json.items) && json.items.length > 0) {
+            items = json.items as Item[];
+          }
+        } catch {}
+      }
+
       setFeatured(items.slice(0, 3));
     })();
   }, []);
 
   return (
     <main className="bg-neutral-50">
+      <Head>
+        <link rel="preload" as="image" href="/hero-image.webp" />
+      </Head>
       {/* Hero: 背景画像とアニメーションを追加 */}
       <section className="relative h-[58vh] md:h-[60vh] min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
         {/* 背景画像: publicフォルダからのパスを指定してください */}
@@ -48,6 +68,7 @@ export default function Home() {
           src="/hero-image.webp"
           alt="Hero background"
           fill
+          sizes="100vw"
           className="object-cover z-0"
           priority
         />
@@ -118,20 +139,22 @@ export default function Home() {
           </header>
 
           <div className="-m-2 flex flex-wrap">
-            {featured.map((p) => {
+            {featured.map((p, index) => {
                 const _src = p.urls.thumb || p.urls.large || p.urls.original;
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">
                   <Link
-                    href={`/gallery#${p.slug}`}
+                    href={`/gallery?open=${encodeURIComponent(p.slug)}`}
+                    prefetch={false}
                     className="group relative block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 hover:shadow-xl transition-shadow duration-300"
                   >
                         <img
+                      decoding="async"
+                      loading="eager"
                       src={_src}
-                          alt={p.caption ?? p.slug}
-                          className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
-                          loading="lazy"
-                        />
+                      alt={p.caption ?? p.slug}
+                      className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
+                    />
                     {/* ホバー時に表示されるグラデーションオーバーレイ */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     

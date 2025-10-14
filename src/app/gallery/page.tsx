@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PhotoAlbum from "react-photo-album";
 import Lightbox from "yet-another-react-lightbox";
@@ -10,6 +10,8 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
+
+export const dynamic = "force-dynamic";
 
 // ===== Types =====
 type Item = {
@@ -36,8 +38,10 @@ function useViewportWidth() {
   return w;
 }
 
-export default function GalleryPage() {
+function GalleryPageInner() {
   const router = useRouter();
+  const params = useSearchParams();
+  const openSlug = params.get("open");
   const [items, setItems] = useState<Item[]>([]);
   const [index, setIndex] = useState<number | -1>(-1);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +61,12 @@ export default function GalleryPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!openSlug || items.length === 0) return;
+    const idx = items.findIndex(i => i.slug === openSlug);
+    if (idx >= 0) setIndex(idx);
+  }, [openSlug, items]);
 
   const visibleItems = items.filter((i) => i.urls.thumb && i.urls.large);
 
@@ -195,6 +205,14 @@ export default function GalleryPage() {
         />
       </section>
     </div>
+  );
+}
+
+export default function GalleryPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-600">Loading gallery...</div>}>
+      <GalleryPageInner />
+    </Suspense>
   );
 }
 
