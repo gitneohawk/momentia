@@ -6,13 +6,16 @@ const CANONICAL_HOST = "www.momentia.photo" as const;
 
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
-  const host = req.headers.get("host")?.toLowerCase() || "";
+  const host = (req.headers.get("host") || "").toLowerCase();
+  const xf = (req.headers.get("x-forwarded-host") || "").toLowerCase();
+  const xfs = xf ? xf.split(",").map((h) => h.trim()).filter(Boolean) : [];
+  const candidates = [host, ...xfs];
 
   // In production, force all traffic to the canonical host for stable cookies/session.
   if (process.env.NODE_ENV === "production") {
     // Allow apex domain (momentia.photo) to remain as-is per product decision; only enforce for non-canonical hosts.
-    const isCanonical = host === CANONICAL_HOST;
-    const isApex = host === "momentia.photo";
+    const isCanonical = candidates.includes(CANONICAL_HOST);
+    const isApex = candidates.includes("momentia.photo");
     if (!isCanonical && !isApex) {
       url.host = CANONICAL_HOST;
       url.protocol = "https:";
