@@ -21,6 +21,11 @@ function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
 }
 function checkHostOrigin(req: Request) {
+  // Allow internal fetches via Next.js Image Optimization pipeline
+  const ref = req.headers.get("referer") || "";
+  if (ref.includes("/_next/image")) {
+    return null as Response | null;
+  }
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
   if (!host || !ALLOWED_HOSTS.has(host)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
