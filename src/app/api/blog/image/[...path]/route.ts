@@ -15,6 +15,11 @@ function clientIp(req: Request): string {
 }
 
 function checkHostOrigin(req: Request) {
+  const referer = req.headers.get("referer") || "";
+  // Allow internal fetches via Next.js Image Optimization pipeline
+  if (referer.includes("/_next/image")) {
+    return null;
+  }
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
   if (!host || !ALLOWED_HOSTS.has(host)) {
     return new Response(JSON.stringify({ error: "forbidden host" }), {
