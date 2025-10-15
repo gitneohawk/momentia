@@ -109,6 +109,34 @@ const logInfo = (...args: any[]) => {
   }
 };
 
+// Helper: strip query string from a URL (removes old SAS etc)
+function stripQuery(u: string): string {
+  try { const url = new URL(u); url.search = ""; return url.toString(); } catch { return u.split("?")[0]; }
+}
+
+// Helper: generate a new Shared Key SAS URL for a blob, given its public URL (even if it has an expired SAS)
+function makeSignedUrl(blobUrl: string): string {
+  try {
+    const clean = stripQuery(blobUrl);
+    const accountName = process.env.AZURE_STORAGE_ACCOUNT || new URL(clean).hostname.split('.')[0];
+    const accountKey = process.env.AZURE_STORAGE_KEY;
+    if (!accountKey) return clean; // fallback
+    const cred = new StorageSharedKeyCredential(accountName, accountKey);
+    const u = new URL(clean);
+    const containerName = u.pathname.split('/')[1];
+    const blobName = u.pathname.split('/').slice(2).join('/');
+    const expiresOn = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+    const sas = generateBlobSASQueryParameters({
+      containerName,
+      blobName,
+      permissions: BlobSASPermissions.from({ read: true }),
+      startsOn: new Date(),
+      expiresOn,
+    }, cred).toString();
+    return `${clean}?${sas}`;
+  } catch { return blobUrl; }
+}
+
 export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const bad = checkHostOrigin(req);
@@ -271,10 +299,10 @@ export async function GET(req: Request) {
       sellDigital: p.sellDigital ?? true,
       sellPanel: p.sellPanel ?? true,
       urls: {
-        original: await getSignedUrl(p.storagePath, SIGNED_TTL_MIN),
-        thumb: thumb ? await getSignedUrl(thumb.storagePath, SIGNED_TTL_MIN) : null,
-        large: large ? await getSignedUrl(large.storagePath, SIGNED_TTL_MIN) : null,
-        watermarked: await getSignedUrl(wmName, SIGNED_TTL_MIN, "watermarks"),
+        original: makeSignedUrl(`${getPublicBase(getEndpointAndCred().endpoint)}/${container}/${encodeURI(p.storagePath)}`),
+        thumb: thumb ? makeSignedUrl(`${getPublicBase(getEndpointAndCred().endpoint)}/${container}/${encodeURI(thumb.storagePath)}`) : null,
+        large: large ? makeSignedUrl(`${getPublicBase(getEndpointAndCred().endpoint)}/${container}/${encodeURI(large.storagePath)}`) : null,
+        watermarked: makeSignedUrl(`${getPublicBase(getEndpointAndCred().endpoint)}/watermarks/${encodeURI(wmName)}`),
       },
     };
   }));
