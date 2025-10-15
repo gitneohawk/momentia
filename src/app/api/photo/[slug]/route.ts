@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } from "@azure/storage-blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,29 @@ function blobBaseFromConn(conn?: string) {
   return "http://127.0.0.1:10000/devstoreaccount1/photos/";
 }
 
+function makeSignedUrl(blobUrl: string): string {
+  try {
+    const accountName = process.env.AZURE_STORAGE_ACCOUNT || new URL(blobUrl).hostname.split('.')[0];
+    const accountKey = process.env.AZURE_STORAGE_KEY;
+    if (!accountKey) return blobUrl; // fallback
+    const cred = new StorageSharedKeyCredential(accountName, accountKey);
+    const u = new URL(blobUrl);
+    const containerName = u.pathname.split('/')[1];
+    const blobName = u.pathname.split('/').slice(2).join('/');
+    const expiresOn = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+    const sas = generateBlobSASQueryParameters({
+      containerName,
+      blobName,
+      permissions: BlobSASPermissions.from({ read: true }),
+      startsOn: new Date(),
+      expiresOn,
+    }, cred).toString();
+    return `${blobUrl}?${sas}`;
+  } catch {
+    return blobUrl;
+  }
+}
+
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ slug: string }> }
@@ -94,9 +118,9 @@ export async function GET(
         sellDigital: p.sellDigital ?? true,
         sellPanel: p.sellPanel ?? true,
         urls: {
-          original: base + p.storagePath,
-          thumb: thumb ? base + thumb.storagePath : null,
-          large: large ? base + large.storagePath : null,
+          original: makeSignedUrl(base + p.storagePath),
+          thumb: thumb ? makeSignedUrl(base + thumb.storagePath) : null,
+          large: large ? makeSignedUrl(base + large.storagePath) : null,
           watermarked: `/api/wm/${p.slug}`,
         },
       },
