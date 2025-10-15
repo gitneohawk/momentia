@@ -1,11 +1,26 @@
 import sharp from "sharp";
-import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
+import { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
 
 const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT || "momentiastorage";
 const PHOTOS_CONTAINER = "photos";
 const WATERMARKS_CONTAINER = process.env.AZURE_BLOB_WATERMARKS_CONTAINER || "watermarks";
 const PUB_PREFIX = "public/";
+
+function getSharedKeyCredential(): StorageSharedKeyCredential {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING || "";
+  if (/(^|;)AccountName=/.test(conn) && /(^|;)AccountKey=/.test(conn)) {
+    const kv = new Map(
+      conn.split(";").map(s => { const i = s.indexOf("="); return i >= 0 ? [s.slice(0, i), s.slice(i + 1)] : ["", ""]; })
+    );
+    const accountName = kv.get("AccountName");
+    const accountKey = kv.get("AccountKey");
+    if (accountName && accountKey) return new StorageSharedKeyCredential(accountName, accountKey);
+  }
+  const key = process.env.AZURE_STORAGE_KEY;
+  if (!key) throw new Error("missing AZURE_STORAGE_KEY for SAS signing");
+  return new StorageSharedKeyCredential(ACCOUNT_NAME, key);
+}
 
 function makeBlobServiceFromEnv(): BlobServiceClient {
   if (process.env.AZURE_USE_MSI === "1") {
@@ -42,7 +57,7 @@ export type GenerateWatermarkOptions = {
   overwrite?: boolean; // 既存があっても再生成するなら true
 };
 
-export async function generateWatermark(opts: GenerateWatermarkOptions): Promise<{ blobName: string }> {
+export async function generateWatermark(opts: GenerateWatermarkOptions): Promise<{ blobName: string; sasUrl?: string }> {
   const width = opts.width ?? 2048;
   const text  = opts.text ?? "© Evoluzio Inc. — Preview";
 
@@ -64,7 +79,8 @@ export async function generateWatermark(opts: GenerateWatermarkOptions): Promise
 
   // 既存WMがあればスキップ（overwriteで上書き可）
   if (!opts.overwrite && (await outBlob.exists())) {
-    return { blobName: outName };
+    const sasUrl = await generateSignedUrlForBlob(outBlob.containerName, outBlob.name, outBlob.url);
+    return { blobName: outName, sasUrl };
   }
 
   // ダウンロード → 合成
@@ -83,7 +99,8 @@ export async function generateWatermark(opts: GenerateWatermarkOptions): Promise
     .toBuffer();
 
   await outBlob.uploadData(composed, { blobHTTPHeaders: { blobContentType: "image/jpeg" } });
-  return { blobName: outName };
+  const sasUrl = await generateSignedUrlForBlob(outBlob.containerName, outBlob.name, outBlob.url);
+  return { blobName: outName, sasUrl };
 }
 
 function makeWatermarkSvg(text: string, width: number) {
@@ -112,4 +129,17 @@ async function streamToBuffer(stream?: NodeJS.ReadableStream | null) {
   const chunks: Buffer[] = [];
   for await (const ch of stream) chunks.push(Buffer.isBuffer(ch) ? ch : Buffer.from(ch));
   return Buffer.concat(chunks);
+}
+
+async function generateSignedUrlForBlob(containerName: string, blobName: string, baseUrl: string): Promise<string> {
+  const cred = getSharedKeyCredential();
+  const expiresOn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const sas = generateBlobSASQueryParameters({
+    containerName,
+    blobName,
+    permissions: BlobSASPermissions.from({ read: true }),
+    startsOn: new Date(),
+    expiresOn,
+  }, cred).toString();
+  return `${baseUrl}?${sas}`;
 }
