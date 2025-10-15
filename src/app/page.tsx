@@ -1,14 +1,9 @@
-"use client";
-
 // Next.js & React のインポート
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import Head from "next/head";
 // import ComingSoon from "@/components/ComingSoon";
-
-// アニメーションライブラリのインポート
-import { motion } from "framer-motion";
+import Hero from "@/components/Hero";
 
 // 型定義
 type Item = {
@@ -21,113 +16,53 @@ type Item = {
   urls: { thumb: string | null; large: string | null; original: string };
 };
 
-export default function Home() {
-  const [featured, setFeatured] = useState<Item[]>([]);
+export const revalidate = 60;
 
-  useEffect(() => {
-    (async () => {
-      // API を並列フェッチ（どちらかが失敗しても片方を使う）
-      const [featResult, recentResult] = await Promise.allSettled([
-        fetch("/api/photos?featured=1&limit=3", { cache: "force-cache" }),
-        fetch("/api/photos?limit=3", { cache: "force-cache" }),
-      ]);
+async function getFeatured(): Promise<Item[]> {
+  // Determine base URL depending on environment
+  const baseUrl =
+    process.env.NODE_ENV === "production"
+      ? "https://www.momentia.photo"
+      : "http://localhost:3000";
 
-      let items: Item[] = [];
+  // API を並列フェッチ（どちらかが失敗しても片方を使う）
+  const [featResult, recentResult] = await Promise.allSettled([
+    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { cache: "force-cache" }),
+    fetch(`${baseUrl}/api/photos?limit=3`, { cache: "force-cache" }),
+  ]);
 
-      if (featResult.status === "fulfilled") {
-        try {
-          const json = await featResult.value.json();
-          if (Array.isArray(json.items) && json.items.length > 0) {
-            items = json.items as Item[];
-          }
-        } catch {}
+  let items: Item[] = [];
+
+  if (featResult.status === "fulfilled") {
+    try {
+      const json = await featResult.value.json();
+      if (Array.isArray(json.items) && json.items.length > 0) {
+        items = json.items as Item[];
       }
+    } catch {}
+  }
 
-      if (items.length === 0 && recentResult.status === "fulfilled") {
-        try {
-          const json = await recentResult.value.json();
-          if (Array.isArray(json.items) && json.items.length > 0) {
-            items = json.items as Item[];
-          }
-        } catch {}
+  if (items.length === 0 && recentResult.status === "fulfilled") {
+    try {
+      const json = await recentResult.value.json();
+      if (Array.isArray(json.items) && json.items.length > 0) {
+        items = json.items as Item[];
       }
+    } catch {}
+  }
 
-      setFeatured(items.slice(0, 3));
-    })();
-  }, []);
+  return items.slice(0, 3);
+}
+
+export default async function Home() {
+  const featured = await getFeatured();
 
   return (
     <main className="bg-neutral-50">
       <Head>
         <link rel="preload" as="image" href="/hero-image.webp" />
       </Head>
-      {/* Hero: 背景画像とアニメーションを追加 */}
-      <section className="relative h-[58vh] md:h-[60vh] min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
-        {/* 背景画像: publicフォルダからのパスを指定してください */}
-        <Image
-          src="/hero-image.webp"
-          alt="Hero background"
-          fill
-          sizes="100vw"
-          className="object-cover z-0"
-          priority
-        />
-        {/* 背景オーバーレイ */}
-        <div className="absolute inset-0 bg-black/30 z-10" />
-
-        {/* 背景グレインテクスチャ */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-15 z-20"
-          style={{
-            backgroundImage: "url(/textures/grain.png)",
-            backgroundSize: "300px 300px",
-            mixBlendMode: "overlay",
-          }}
-        />
-
-        {/* コンテンツ */}
-        <div className="relative z-30 px-4">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            // tailwind.config.jsで設定したセリフ体フォントを適用
-            className="font-serif text-4xl md:text-6xl font-medium tracking-tight text-white drop-shadow-md"
-          >
-            Momentia
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-            className="mt-4 text-lg md:text-xl text-neutral-200 max-w-2xl mx-auto drop-shadow"
-          >
-            光と時間の呼吸を、そっと壁に。— 静けさを連れてくる写真たち。
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
-            className="mt-8 flex flex-wrap gap-4 justify-center"
-          >
-            <Link
-              href="/gallery"
-              // ガラスモーフィズム風のデザインに更新
-              className="inline-flex items-center rounded-lg border border-white/30 bg-white/20 backdrop-blur-sm px-5 py-2.5 text-base font-medium text-white shadow-sm hover:bg-white/30 transition-colors"
-            >
-              ギャラリーを見る
-            </Link>
-            {/* <Link
-              href="/purchase/info"
-              className="inline-flex items-center rounded-lg px-5 py-2.5 bg-white text-base font-medium text-neutral-900 hover:bg-neutral-200 transition-colors"
-            >
-              ご購入について
-            </Link> */}
-          </motion.div>
-        </div>
-      </section>
+      <Hero />
 
       {/* Featured Works: ホバーエフェクトとデザインを更新 */}
       <section className="hidden md:block py-6 sm:py-8 bg-white">
