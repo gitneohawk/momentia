@@ -35,14 +35,14 @@ function validateSlug(slug?: string): boolean {
 // --- メインのGETハンドラ ---
 export async function GET(
   req: NextRequest,
-  // ★★★ 最後の修正点 ★★★
+  // ★★★ これが最後の修正点 ★★★
   // GETハンドラの引数を、他のAPIと同様の App Router の規約に準拠した型定義に修正
-  { params }: { params: { slug: string } }
+  context: { params: { slug: string } }
 ) {
   try {
-    const { slug } = params;
+    const { slug } = context.params;
     if (!validateSlug(slug)) {
-      return NextResponse.json({ error: "Bad Request" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ error: "Bad Request" }, { status: 400, headers: { "Cache-control": "no-store" } });
     }
 
     const badOrigin = checkHostOrigin(req);
@@ -61,7 +61,7 @@ export async function GET(
     });
 
     if (!photo) {
-      return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-control": "no-store" } });
     }
 
     const getSignedUrl = createSasGenerator();
@@ -95,6 +95,6 @@ export async function GET(
 
   } catch (e: any) {
     console.error("[/api/photo/slug] Critical error:", e);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500, headers: { "Cache-control": "no-store" } });
   }
 }
