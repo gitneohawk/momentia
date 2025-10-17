@@ -16,37 +16,29 @@ const CONTAINER = process.env.AZURE_BLOG_CONTAINER || "blog";
 function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
 }
-
 function checkHostOrigin(req: Request): Response | null {
   const referer = req.headers.get("referer") || "";
-  if (referer.includes("/_next/image")) {
-    return null;
-  }
+  if (referer.includes("/_next/image")) { return null; }
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
   if (!host || !ALLOWED_HOSTS.has(host)) {
     return new Response(JSON.stringify({ error: "forbidden host" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      status: 403, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   }
   return null;
 }
-
 function sanitizePath(parts: string[]): string | null {
   if (!Array.isArray(parts) || parts.length === 0 || parts.length > 5) return null;
-  for (const p of parts) {
-    if (!p || p === "." || p === ".." || p.includes("\\")) return null;
-  }
+  for (const p of parts) { if (!p || p === "." || p === ".." || p.includes("\\")) return null; }
   return parts.join("/");
 }
-
-// ★★★ streamToBuffer関数は未使用のため削除 ★★★
 
 // --- メインのGETハンドラ ---
 export async function GET(
   req: NextRequest,
-  // ★★★ 最後の修正点：型定義を正しい App Router の規約に修正 ★★★
-  { params }: { params: { path: string[] } }
+  // ★★★ これが最後の修正点 ★★★
+  // 分割代入 `{ params }` をやめ、`context` オブジェクトとして受け取る
+  context: { params: { path: string[] } }
 ) {
   try {
     const badOrigin = checkHostOrigin(req);
@@ -62,7 +54,8 @@ export async function GET(
       return r;
     }
 
-    const { path } = params;
+    // 関数の中で context から path を取り出す
+    const { path } = context.params;
     const key = sanitizePath(path);
     if (!key) {
       return NextResponse.json({ error: "bad path" }, { status: 400 });
