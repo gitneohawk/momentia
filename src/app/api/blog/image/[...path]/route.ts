@@ -1,22 +1,24 @@
-import { BlobServiceClient } from "@azure/storage-blob";
+import { NextResponse, type NextRequest } from "next/server"; // ★ NextRequest をインポート
+import { blobServiceClient } from "@/lib/azure-storage";      // ★ 共通クライアントをインポート
 import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// --- ヘルパー関数 ---
+const blogImageLimiter = createRateLimiter({ prefix: "blog:image", limit: 120, windowMs: 60_000 });
 const ALLOWED_HOSTS = new Set([
   "www.momentia.photo",
   ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
 ]);
-const blogImageLimiter = createRateLimiter({ prefix: "blog:image", limit: 120, windowMs: 60_000 });
+const CONTAINER = process.env.AZURE_BLOG_CONTAINER || "blog";
 
 function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
 }
 
-function checkHostOrigin(req: Request) {
+function checkHostOrigin(req: Request): Response | null {
   const referer = req.headers.get("referer") || "";
-  // Allow internal fetches via Next.js Image Optimization pipeline
   if (referer.includes("/_next/image")) {
     return null;
   }
@@ -30,69 +32,61 @@ function checkHostOrigin(req: Request) {
   return null;
 }
 
-const CONTAINER = process.env.AZURE_BLOG_CONTAINER || "blog";
-
-function sanitizePath(parts: string[]) {
-  if (!Array.isArray(parts) || parts.length === 0) return null;
-  if (parts.length > 5) return null; // limit depth
+function sanitizePath(parts: string[]): string | null {
+  if (!Array.isArray(parts) || parts.length === 0 || parts.length > 5) return null;
   for (const p of parts) {
     if (!p || p === "." || p === ".." || p.includes("\\")) return null;
   }
   return parts.join("/");
 }
 
-function getBlobService() {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("missing AZURE_STORAGE_CONNECTION_STRING");
-  return BlobServiceClient.fromConnectionString(conn);
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
+
+// --- メインのGETハンドラ ---
 export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ path: string[] }> }
+  req: NextRequest, // ★ Request を NextRequest に変更
+  { params }: { params: { path: string[] } } // ★ 型定義を最新の書き方に修正
 ) {
   try {
+    // ★★★ 修正点1: ここでセキュリティチェックを呼び出す ★★★
+    const badOrigin = checkHostOrigin(req);
+    if (badOrigin) {
+      return badOrigin;
+    }
 
     const ip = clientIp(req);
     const { ok, resetSec } = await blogImageLimiter.hit(ip);
     if (!ok) {
-      const r = new Response(JSON.stringify({ error: "rate_limited" }), {
-        status: 429,
-        headers: { "Content-Type": "application/json" },
-      });
+      const r = NextResponse.json({ error: "rate_limited" }, { status: 429 });
       r.headers.set("Retry-After", String(resetSec));
       return r;
     }
 
-    const { path } = await params;
+    const { path } = params; // ★ await が不要になった
     const key = sanitizePath(path);
     if (!key) {
-      return new Response(JSON.stringify({ error: "bad path" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      });
+      return NextResponse.json({ error: "bad path" }, { status: 400 });
     }
 
-    const service = getBlobService();
-    const container = service.getContainerClient(CONTAINER);
-    const blob = container.getBlockBlobClient(key);
+    const containerClient = blobServiceClient.getContainerClient(CONTAINER);
+    const blobClient = containerClient.getBlockBlobClient(key);
 
-    const exists = await blob.exists();
+    const exists = await blobClient.exists();
     if (!exists) {
-      return new Response(JSON.stringify({ error: "not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      });
+      return NextResponse.json({ error: "not found" }, { status: 404 });
     }
 
-    const props = await blob.getProperties();
-    const contentType =
-      props.contentType ||
-      (key.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg");
+    const properties = await blobClient.getProperties();
+    const contentType = properties.contentType || (key.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg");
 
-    // ★ ストリーミングで返す（型エラー回避 & メモリ効率◎）
-    const dl = await blob.download();
-    const stream = dl.readableStreamBody!;
+    const downloadResponse = await blobClient.download();
+    const stream = downloadResponse.readableStreamBody!;
+    
     return new Response(stream as unknown as ReadableStream, {
       status: 200,
       headers: {
@@ -100,11 +94,9 @@ export async function GET(
         "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable",
       },
     });
+
   } catch (e: any) {
-    console.error(e);
-    return new Response(JSON.stringify({ error: String(e?.message || e) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-    });
+    console.error("[/api/blog/image] Critical error:", e);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

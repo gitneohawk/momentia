@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { blobServiceClient } from "@/lib/azure-storage";
 import sharp from "sharp";
-import crypto from "crypto";
 import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";

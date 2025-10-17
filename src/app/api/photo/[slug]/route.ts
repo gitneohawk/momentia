@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { createSasGenerator } from "@/lib/azure-storage"; // ★ 共通のSAS生成関数をインポート
+import { createSasGenerator } from "@/lib/azure-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,6 @@ function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
 }
 function checkHostOrigin(req: Request) {
-  // (この関数の内容は変更なし)
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
   if (!host || !ALLOWED_HOSTS.has(host)) { return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } }); }
   const origin = (req.headers.get("origin") || "").toLowerCase();
@@ -36,7 +35,9 @@ function validateSlug(slug?: string): boolean {
 // --- メインのGETハンドラ ---
 export async function GET(
   req: NextRequest,
-  { params }: { params: { slug: string } } // ★ GETハンドラの引数を最新の書き方に修正
+  // ★★★ 最後の修正点 ★★★
+  // GETハンドラの引数を、他のAPIと同様の App Router の規約に準拠した型定義に修正
+  { params }: { params: { slug: string } }
 ) {
   try {
     const { slug } = params;
@@ -55,7 +56,7 @@ export async function GET(
     }
 
     const photo = await prisma.photo.findUnique({
-      where: { slug, published: true }, // published: true を条件に追加
+      where: { slug, published: true },
       include: { variants: true, keywords: true },
     });
 
@@ -63,7 +64,6 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
     }
 
-    // ★ 共通のSAS生成関数を呼び出す
     const getSignedUrl = createSasGenerator();
     const thumb = photo.variants.find(v => v.type === "thumb");
     const large = photo.variants.find(v => v.type === "large");
@@ -79,7 +79,6 @@ export async function GET(
       sellDigital: photo.sellDigital ?? true,
       sellPanel: photo.sellPanel ?? true,
       urls: {
-        // ★ 安全な getSignedUrl を使用
         original: await getSignedUrl(photo.storagePath, "photos"),
         thumb: thumb ? await getSignedUrl(thumb.storagePath, "photos") : null,
         large: large ? await getSignedUrl(large.storagePath, "photos") : null,

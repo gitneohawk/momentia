@@ -1,8 +1,6 @@
 // Next.js & React のインポート
 import Link from "next/link";
 import Image from "next/image";
-// import ComingSoon from "@/components/ComingSoon";
-import Hero from "@/components/Hero";
 
 // 型定義
 type Item = {
@@ -70,7 +68,7 @@ export default async function Home() {
           </header>
 
           <div className="-m-2 flex flex-wrap">
-            {featured.map((p, index) => {
+            {featured.map((p) => {
                 const _src = p.urls.thumb || p.urls.large || p.urls.original;
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">
