@@ -35,9 +35,7 @@ function validateSlug(slug?: string): boolean {
 // --- メインのGETハンドラ ---
 export async function GET(
   req: NextRequest,
-  // ★★★ これが最後の修正点 ★★★
-  // GETハンドラの引数を、他のAPIと同様の App Router の規約に準拠した型定義に修正
-  context: { params: { slug: string } }
+  context: any // 型推論に任せる
 ) {
   try {
     const { slug } = context.params;
