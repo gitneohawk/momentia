@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server"; // ★ NextRequest をインポート
-import { blobServiceClient } from "@/lib/azure-storage";      // ★ 共通クライアントをインポート
+import { NextResponse, type NextRequest } from "next/server";
+import { blobServiceClient } from "@/lib/azure-storage";
 import { createRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -40,20 +40,15 @@ function sanitizePath(parts: string[]): string | null {
   return parts.join("/");
 }
 
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  return Buffer.concat(chunks);
-}
-
+// ★★★ streamToBuffer関数は未使用のため削除 ★★★
 
 // --- メインのGETハンドラ ---
 export async function GET(
-  req: NextRequest, // ★ Request を NextRequest に変更
-  { params }: { params: { path: string[] } } // ★ 型定義を最新の書き方に修正
+  req: NextRequest,
+  // ★★★ 最後の修正点：型定義を正しい App Router の規約に修正 ★★★
+  { params }: { params: { path: string[] } }
 ) {
   try {
-    // ★★★ 修正点1: ここでセキュリティチェックを呼び出す ★★★
     const badOrigin = checkHostOrigin(req);
     if (badOrigin) {
       return badOrigin;
@@ -67,7 +62,7 @@ export async function GET(
       return r;
     }
 
-    const { path } = params; // ★ await が不要になった
+    const { path } = params;
     const key = sanitizePath(path);
     if (!key) {
       return NextResponse.json({ error: "bad path" }, { status: 400 });
