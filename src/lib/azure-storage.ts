@@ -6,7 +6,17 @@ import {
 } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
 
-function initializeBlobServiceClient() {
+// ★★★ 修正点1: クライアントのインスタンスを保持する変数を準備 ★★★
+let _client: BlobServiceClient | null = null;
+
+// ★★★ 修正点2: クライアントを返すシングルトン（単一インスタンス）関数に変更 ★★★
+function getBlobServiceClient(): BlobServiceClient {
+  // 既にインスタンスがあれば、それを返す
+  if (_client) {
+    return _client;
+  }
+
+  // なければ、ここで初めて初期化する
   const accountName = process.env.AZURE_STORAGE_ACCOUNT;
   const useMsi = process.env.AZURE_USE_MSI === "1";
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -14,23 +24,23 @@ function initializeBlobServiceClient() {
   if (useMsi && accountName) {
     console.log("[Azure Storage] Initializing with Managed Identity (MSI).");
     const endpoint = `https://${accountName}.blob.core.windows.net`;
-    return new BlobServiceClient(endpoint, new DefaultAzureCredential());
+    _client = new BlobServiceClient(endpoint, new DefaultAzureCredential());
+    return _client;
   }
 
   if (connectionString) {
     console.log("[Azure Storage] Initializing with Connection String.");
-    return BlobServiceClient.fromConnectionString(connectionString);
+    _client = BlobServiceClient.fromConnectionString(connectionString);
+    return _client;
   }
   
   throw new Error("Azure Storage configuration is missing.");
 }
 
-// 共通のBlobServiceClientインスタンス
-export const blobServiceClient = initializeBlobServiceClient();
+// ★★★ 修正点3: エクスポートするものを関数に変更 ★★★
+export const blobServiceClient = getBlobServiceClient();
 
-// --- ▼▼▼ ここからSAS生成関数を追加 ▼▼▼ ---
-
-// SAS生成ロジックを共通化したファクトリ関数
+// --- SAS生成関数 (ここから下は変更なし) ---
 export function createSasGenerator() {
   const accountName = process.env.AZURE_STORAGE_ACCOUNT || null;
   const useMsi = process.env.AZURE_USE_MSI === "1";
@@ -59,7 +69,8 @@ export function createSasGenerator() {
     if (cached && cached.expiresAt - Date.now() > 30_000) {
       return cached.url;
     }
-
+    
+    const _client = getBlobServiceClient(); // ★ 常に最新のクライアントを取得
     const now = new Date();
     const SKEW_MIN = Number(process.env.SAS_SKEW_MINUTES ?? 10);
     const round = (d: Date) => new Date(Math.floor(d.getTime() / 1000) * 1000);
@@ -67,12 +78,11 @@ export function createSasGenerator() {
     const expiresOn = round(new Date(now.getTime() + ttlMinutes * 60 * 1000));
     const expiresAt = expiresOn.getTime();
     
-    // --- 本番向け: Managed Identity (MSI) ---
     if (useMsi && accountName) {
       try {
-        const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+        const userDelegationKey = await _client.getUserDelegationKey(startsOn, expiresOn);
         const sas = generateBlobSASQueryParameters({ containerName, blobName: storagePath, permissions: BlobSASPermissions.parse("r"), startsOn, expiresOn }, userDelegationKey, accountName).toString();
-        const publicEndpoint = process.env.AZURE_BLOB_PUBLIC_ENDPOINT || blobServiceClient.url.replace(/\/$/, "");
+        const publicEndpoint = process.env.AZURE_BLOB_PUBLIC_ENDPOINT || _client.url.replace(/\/$/, "");
         const url = `${publicEndpoint}/${containerName}/${encodeURI(storagePath)}?${sas}`;
         sasCache.set(key, { url, expiresAt });
         return url;
@@ -82,7 +92,6 @@ export function createSasGenerator() {
       }
     }
     
-    // --- 開発向け: 接続文字列 ---
     if (connectionString) {
       try {
         const { publicEndpoint, credential } = parseConnString();
