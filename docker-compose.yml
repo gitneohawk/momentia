@@ -5,7 +5,7 @@ services:
     image: momentia-app-dev # 開発用はイメージ名を分けておくと管理しやすい
     build:
       context: .
-      target: development # <--- この行を追加！
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     env_file:

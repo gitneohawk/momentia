@@ -54,9 +54,7 @@ jobs:
           set -euo pipefail
           TS=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}
           echo "TAG=${TS}" >> $GITHUB_ENV
-          # ★★★ 修正点 ★★★
-          # --target runner を追加して、本番用の 'runner' ステージをビルドターゲットとして明示的に指定
-          az acr build -r "$ACR" -t "$REPO:${TS}" --target runner .
+          az acr build -r "$ACR" -t "$REPO:${TS}" . --target runner
 
       # タグの出現を待ってから digest を取得（整合性遅延対策）
       - name: Resolve digest (wait until tag visible)
