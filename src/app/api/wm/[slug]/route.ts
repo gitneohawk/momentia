@@ -52,7 +52,7 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 // --- メインのGETハンドラ ---
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const url = req.nextUrl;
   const debugParam = url.searchParams.get(DEBUG_QUERY_KEY);
   const debug: boolean = debugParam === "1" || debugParam === "true";
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       return r;
     }
 
-    const { slug } = params;
+    const { slug } = context.params;
     if (!validateSlugStrict(slug)) {
       return new NextResponse("Bad Request", { status: 400 });
     }
