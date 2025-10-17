@@ -51,7 +51,7 @@ function GalleryPageInner() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/photos", { cache: "force-cache" });
+        const res = await fetch("/api/photos", { cache: "no-store" });
         const raw = await res.text();
         const json = raw ? JSON.parse(raw) : { items: [] };
         if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);

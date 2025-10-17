@@ -3,11 +3,28 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package*.json ./
-# dev依存も入るように（NODE_ENV=production をここで付けない）
-# RUN --mount=type=cache,target=/root/.npm \
-#    npm ci --ignore-scripts
 RUN npm ci --ignore-scripts
 
+# ---------- development ----------
+FROM deps AS development
+WORKDIR /app
+
+# フォント描画に必要なパッケージをインストール
+RUN apk add --no-cache fontconfig ttf-dejavu font-noto
+
+# 'deps'ステージからインストール済みのnode_modulesをコピー
+COPY --from=deps /app/node_modules ./node_modules
+# プロジェクトの全ファイルをコピー
+COPY . .
+
+# Prisma Clientを生成
+RUN npx prisma generate
+
+# 開発サーバーが使用するポートを公開
+EXPOSE 3000
+
+# 開発サーバーを起動するコマンド
+CMD ["npm", "run", "dev"]
 # ---------- builder ----------
 FROM node:22-alpine AS builder
 WORKDIR /app

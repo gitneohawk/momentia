@@ -1,7 +1,6 @@
 // Next.js & React のインポート
 import Link from "next/link";
 import Image from "next/image";
-import Head from "next/head";
 // import ComingSoon from "@/components/ComingSoon";
 import Hero from "@/components/Hero";
 
@@ -27,8 +26,9 @@ async function getFeatured(): Promise<Item[]> {
 
   // API を並列フェッチ（どちらかが失敗しても片方を使う）
   const [featResult, recentResult] = await Promise.allSettled([
-    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { cache: "force-cache" }),
-    fetch(`${baseUrl}/api/photos?limit=3`, { cache: "force-cache" }),
+    // { cache: "force-cache" } を ISR の設定に合わせる
+    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { next: { revalidate: 60 } }),
+    fetch(`${baseUrl}/api/photos?limit=3`, { next: { revalidate: 60 } }),
   ]);
 
   let items: Item[] = [];
@@ -59,10 +59,6 @@ export default async function Home() {
 
   return (
     <main className="bg-neutral-50">
-      <Head>
-        <link rel="preload" as="image" href="/hero-image.webp" />
-      </Head>
-      <Hero />
 
       {/* Featured Works: ホバーエフェクトとデザインを更新 */}
       <section className="hidden md:block py-6 sm:py-8 bg-white">

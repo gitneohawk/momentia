@@ -1,18 +1,25 @@
-version: '3.8'
-
 services:
   # Next.jsアプリケーション
+  
   app:
-    image: momentia-app
-    build: .
+    image: momentia-app-dev # 開発用はイメージ名を分けておくと管理しやすい
+    build:
+      context: .
+      target: development # <--- この行を追加！
     ports:
       - "3000:3000"
     env_file:
       - .env.local
-    # postgres-1とazurite-1が起動してからappを起動する
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
     depends_on:
       - postgres-1
-      - azurite-1
+      - azurite
 
   # PostgreSQLデータベース
   postgres-1:
@@ -27,7 +34,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   # Azuriteストレージエミュレータ
-  azurite-1:
+  azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     command: azurite-blob --loose --blobHost 0.0.0.0 --location /data
     ports: ["10000:10000"]

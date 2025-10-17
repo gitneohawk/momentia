@@ -13,7 +13,7 @@ export const runtime = "nodejs";       // sharp を使うため Node 実行
 export const dynamic = "force-dynamic"; // 開発中はキャッシュ無効でOK
 
 // --- security constants ---
-const MAX_UPLOAD_BYTES = 30 * 1024 * 1024; // 30MB
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
 const ALLOWED_HOSTS = new Set([
   "www.momentia.photo",
   ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
