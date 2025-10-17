@@ -35,10 +35,9 @@ function sanitizePath(parts: string[]): string | null {
 
 // --- メインのGETハンドラ ---
 export async function GET(
-  req: NextRequest,
   // ★★★ これが最後の修正点 ★★★
-  // 分割代入 `{ params }` をやめ、`context` オブジェクトとして受け取る
-  context: { params: { path: string[] } }
+  // 問題の2番目の引数を完全に削除
+  req: NextRequest
 ) {
   try {
     const badOrigin = checkHostOrigin(req);
@@ -54,8 +53,14 @@ export async function GET(
       return r;
     }
 
-    // 関数の中で context から path を取り出す
-    const { path } = context.params;
+    // ★★★ reqオブジェクトからURLパスを手動で解析 ★★★
+    const pathname = req.nextUrl.pathname;
+    const basePath = "/api/blog/image/";
+    if (!pathname.startsWith(basePath)) {
+      return NextResponse.json({ error: "Invalid route" }, { status: 400 });
+    }
+    const path = pathname.substring(basePath.length).split('/');
+
     const key = sanitizePath(path);
     if (!key) {
       return NextResponse.json({ error: "bad path" }, { status: 400 });
