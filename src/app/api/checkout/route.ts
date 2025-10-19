@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getToken } from 'next-auth/jwt';
 
+import { prisma } from '@/lib/prisma';
 import { createRateLimiter } from '@/lib/rate-limit';
 
 const checkoutLimiter = createRateLimiter({ prefix: 'checkout', limit: 60, windowMs: 60_000 });
@@ -54,7 +55,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { itemType, amountJpy, slug, customerEmail } = body;
+    const { itemType, slug, customerEmail } = body;
+    const clientAmount = Number(body?.amountJpy);
     let { name } = body;
 
     // Strict validations
@@ -62,22 +64,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid itemType' }, { status: 400 });
     }
 
-    if (
-      typeof amountJpy !== 'number' ||
-      !Number.isInteger(amountJpy) ||
-      !Number.isFinite(amountJpy) ||
-      amountJpy < 100 ||
-      amountJpy > 2000000
-    ) {
-      return NextResponse.json({ error: 'invalid amount' }, { status: 400 });
-    }
-
     if (typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ error: 'invalid name' }, { status: 400 });
     }
     name = name.trim().replace(/\r?\n/g, ' ').slice(0, 120);
 
-    const safeSlug = slug != null ? String(slug).slice(0, 120) : undefined;
+    if (typeof slug !== 'string' || !slug.trim()) {
+      return NextResponse.json({ error: 'invalid slug' }, { status: 400 });
+    }
+    const safeSlug = String(slug).trim().slice(0, 120);
 
     // 入力された customerEmail を最優先に使用（未入力時のみログインメールをフォールバック）
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -124,6 +119,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid baseUrl' }, { status: 400 });
     }
 
+    const photo = await prisma.photo.findUnique({
+      where: { slug: safeSlug, published: true },
+      select: {
+        caption: true,
+        priceDigitalJPY: true,
+        pricePrintA2JPY: true,
+        sellDigital: true,
+        sellPanel: true,
+      },
+    });
+    if (!photo) {
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+
+    const priceFromDb = itemType === 'digital' ? photo.priceDigitalJPY : photo.pricePrintA2JPY;
+    if (priceFromDb == null || !Number.isFinite(priceFromDb) || priceFromDb <= 0) {
+      return NextResponse.json({ error: 'price unavailable' }, { status: 400 });
+    }
+
+    if (itemType === 'digital' && photo.sellDigital === false) {
+      return NextResponse.json({ error: 'digital unavailable' }, { status: 403 });
+    }
+    if (itemType === 'panel' && photo.sellPanel === false) {
+      return NextResponse.json({ error: 'panel unavailable' }, { status: 403 });
+    }
+
+    if (
+      Number.isFinite(clientAmount) &&
+      Math.abs(Number(clientAmount) - Number(priceFromDb)) > 0
+    ) {
+      console.warn('[checkout] amount mismatch', {
+        clientAmount,
+        price: priceFromDb,
+        slug: safeSlug,
+        itemType,
+      });
+    }
+
+    const amountJpy = Math.trunc(Number(priceFromDb));
+    const productName = name || photo.caption || safeSlug;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_creation: 'always',
@@ -135,14 +171,14 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: 'jpy',
             unit_amount: amountJpy,
-            product_data: { name },
+            product_data: { name: productName },
           },
           quantity: 1,
         },
       ],
       metadata: {
         itemType,
-        name,
+        name: productName,
         ...(safeSlug ? { slug: safeSlug } : {}),
       },
       ...(itemType === 'panel'

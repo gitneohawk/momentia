@@ -140,10 +140,16 @@ export async function GET(req: NextRequest) {
 
   const { accountName, accountKey } = getStorageCreds();
   const containerName = process.env.AZURE_STORAGE_CONTAINER || "photos";
-  const basePath = process.env.AZURE_BLOB_BASE_PATH || "public"; // e.g. photos/public/xxx
-  const suffix = process.env.DOWNLOAD_SUFFIX || `_${size}`; // e.g. _2048
+  const basePath = (process.env.AZURE_BLOB_BASE_PATH || "originals")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  const suffix = process.env.DOWNLOAD_SUFFIX != null
+    ? process.env.DOWNLOAD_SUFFIX
+    : basePath === "originals"
+      ? ""
+      : `_${size}`;
 
-  // 例: public/tulips_2048.jpg
+  // 例: originals/tulips.jpg (suffixが空の場合)
   const blobName = `${basePath}/${order.slug}${suffix}.jpg`;
   const safeSlug = sanitizeFilenamePart(order.slug);
   const safeSuffix = sanitizeFilenamePart(suffix);
