@@ -18,13 +18,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.blob.core.windows.net", pathname: "/photos/**" },
     ],
   },
-  // --- ▼▼▼ ここから追加 ▼▼▼ ---
-  api: {
-    bodyParser: {
-      sizeLimit: '100mb', // アップロード上限を20MBに設定
-    },
-  },
-  // --- ▲▲▲ ここまで追加 ▲▲▲ ---
   // サーバで必要なネイティブパッケージ
   serverExternalPackages: ["@azure/identity", "@azure/storage-blob", "@prisma/client", "prisma"],
 };

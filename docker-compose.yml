@@ -19,7 +19,7 @@ services:
     command: npm run dev
     depends_on:
       - postgres-1
-      - azurite
+      - azurite-1
 
   # PostgreSQLデータベース
   postgres-1:
@@ -34,7 +34,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   # Azuriteストレージエミュレータ
-  azurite:
+  azurite-1:
     image: mcr.microsoft.com/azure-storage/azurite
     command: azurite-blob --loose --blobHost 0.0.0.0 --location /data
     ports: ["10000:10000"]

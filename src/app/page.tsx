@@ -1,6 +1,9 @@
 // Next.js & React のインポート
 import Link from "next/link";
 import Image from "next/image";
+// import ComingSoon from "@/components/ComingSoon";
+import Hero from "@/components/Hero";
+import { Metadata } from "next";
 
 // 型定義
 type Item = {
@@ -24,9 +27,8 @@ async function getFeatured(): Promise<Item[]> {
 
   // API を並列フェッチ（どちらかが失敗しても片方を使う）
   const [featResult, recentResult] = await Promise.allSettled([
-    // { cache: "force-cache" } を ISR の設定に合わせる
-    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { next: { revalidate: 60 } }),
-    fetch(`${baseUrl}/api/photos?limit=3`, { next: { revalidate: 60 } }),
+    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { cache: "force-cache" }),
+    fetch(`${baseUrl}/api/photos?limit=3`, { cache: "force-cache" }),
   ]);
 
   let items: Item[] = [];
@@ -52,11 +54,20 @@ async function getFeatured(): Promise<Item[]> {
   return items.slice(0, 3);
 }
 
+export const metadata: Metadata = {
+  title: "Momentia",
+  description: "Momentia is a photography label operated by Evoluzio Inc.",
+  icons: {
+    icon: "/hero-image.webp",
+  },
+};
+
 export default async function Home() {
   const featured = await getFeatured();
 
   return (
     <main className="bg-neutral-50">
+      <Hero />
 
       {/* Featured Works: ホバーエフェクトとデザインを更新 */}
       <section className="hidden md:block py-6 sm:py-8 bg-white">
@@ -68,7 +79,7 @@ export default async function Home() {
           </header>
 
           <div className="-m-2 flex flex-wrap">
-            {featured.map((p) => {
+            {featured.map((p, index) => {
                 const _src = p.urls.thumb || p.urls.large || p.urls.original;
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">

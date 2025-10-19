@@ -140,7 +140,7 @@ function GalleryPageInner() {
             layout="rows"
             photos={photos.map((p) => ({ src: p.src, width: p.width, height: p.height, key: p.key }))}
             targetRowHeight={rowH}
-            rowConstraints={{ minPhotos: 2, maxPhotos: 4 }}
+            rowConstraints={{ minPhotos: 1, maxPhotos: 4 }}
             onClick={({ index }) => setIndex(index)}
             componentsProps={{
               image: {
