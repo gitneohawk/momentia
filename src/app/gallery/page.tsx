@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PhotoAlbum from "react-photo-album";
@@ -47,6 +47,7 @@ function GalleryPageInner() {
   const [error, setError] = useState<string | null>(null);
   const vw = useViewportWidth();
   const rowH = vw < 640 ? 150 : vw < 900 ? 170 : vw < 1280 ? 200 : 220;
+  const preloaded = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -69,6 +70,36 @@ function GalleryPageInner() {
     const idx = visibleItems.findIndex((i) => i.slug === openSlug);
     setIndex(idx >= 0 ? idx : -1);
   }, [openSlug, visibleItems]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || visibleItems.length === 0) return;
+    const head = document.head;
+    if (!head) return;
+
+    const preloadTargets = visibleItems
+      .slice(0, 6)
+      .map((item) => item.urls.thumb ?? item.urls.large)
+      .filter((src): src is string => typeof src === "string" && src.length > 0);
+
+    const created: Array<{ src: string; el: HTMLLinkElement }> = [];
+    for (const src of preloadTargets) {
+      if (preloaded.current.has(src)) continue;
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      link.href = src;
+      head.appendChild(link);
+      preloaded.current.add(src);
+      created.push({ src, el: link });
+    }
+
+    return () => {
+      for (const { src, el } of created) {
+        if (el.parentNode === head) head.removeChild(el);
+        preloaded.current.delete(src);
+      }
+    };
+  }, [visibleItems]);
 
   const photos = visibleItems.map((i) => ({
     key: i.slug,
@@ -146,6 +177,8 @@ function GalleryPageInner() {
               image: {
                 className:
                   "m-2 sm:m-3 rounded-2xl shadow-md ring-1 ring-black/5 bg-white/95 transition-transform duration-300 hover:scale-[1.01] hover:shadow-xl overflow-hidden",
+                loading: "lazy",
+                decoding: "async",
               },
             }}
           />

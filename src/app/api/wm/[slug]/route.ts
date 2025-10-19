@@ -24,7 +24,7 @@ function wmFileName(slug: string, width: number) { return `${slug}_wm_${width}_v
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> { const chunks: Buffer[] = []; for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)); return Buffer.concat(chunks); }
 
 // --- メインのGETハンドラ ---
-export async function GET(req: NextRequest, context: any) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const url = req.nextUrl;
   const debugParam = url.searchParams.get(DEBUG_QUERY_KEY);
   const debug: boolean = debugParam === "1" || debugParam === "true";
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, context: any) {
     const { ok, resetSec } = await wmLimiter.hit(clientIp(req));
     if (!ok) { const r = NextResponse.json({ error: "rate_limited" }, { status: 429 }); r.headers.set("Retry-After", String(resetSec)); return r; }
     
-    const { slug } = context.params;
+    const { slug } = await params;
     if (!validateSlugStrict(slug)) { return new NextResponse("Bad Request", { status: 400 }); }
     
     const photo = await prisma.photo.findUnique({ where: { slug }, include: { variants: true } });
