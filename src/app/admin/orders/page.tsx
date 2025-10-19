@@ -31,7 +31,9 @@ export default async function OrdersPage() {
   <tr key={o.sessionId} className="border-t hover:bg-neutral-50">
     <td className="px-3 py-2">
       <Link href={`/admin/orders/${o.sessionId}`} className="underline-offset-2 hover:underline">
-        {new Date(o.createdAt).toLocaleString()}
+        {new Date(o.createdAt).toLocaleString("ja-JP", {
+          timeZone: "Asia/Tokyo",
+        })}
       </Link>
     </td>
     <td className="px-3 py-2">{o.email ?? "-"}</td>
