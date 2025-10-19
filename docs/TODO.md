@@ -17,6 +17,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 7. [x] 値段表示を調整：デジタル商品は「（税込）」、パネル商品は「（送料込み・税込）」と明記（全画面反映済み）
 8. ペネトレーションテストを実施（認証・決済・管理画面／APIを対象に、外部委託＋自動スキャンの二段構え）
 9. ログ／監視／アラートを整備（Azure Monitor・Container Apps・PostgreSQL・Stripe Webhook失敗の監視と通知）
+10. [x] フォトグラファー管理＆ギャラリーフィルタ機能を追加（マルチ写真家対応の基盤整備）
 
 ## 目的
 記事を追加・編集するたびにGitHubへコミットせずに済む、軽量なブログ用CMSを実装する。
@@ -150,6 +151,9 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] 監視設定の IaC 化（Bicep/Terraform もしくは `az monitor` スクリプト）
 - [ ] ACS 送信ログを Log Analytics に転送し、配信失敗割合のアラートを作成
 - [ ] Stripe Webhook のイベント処理ログに `orderId` / `customerEmail` を必ず含める（PIIは必要最小限）
+- [x] 管理画面の注文一覧を JST 表示に統一
+- [ ] Stripe Webhook テスト手順をドキュメント化（Stripe CLI でのフォワード含む）
+- [ ] リリース前にテスト注文・AccessToken をクリアする手順を用意
 - [ ] 本番リリース時に HTTP Header（Content-Security-Policy等）の再検討を行う（開発環境ではデバッグ用に緩和したCSPを使用しており、本番環境では厳格なCSP、Referrer-Policy、Permissions-Policyを再導入予定）
 
 ## 問い合わせフォーム / メール通知関連
@@ -179,3 +183,4 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] ログ／監視／アラート 最低限稼働
 - [ ] 問い合わせフォーム／決済成功・失敗動作の確認
 - [ ] メール送信の到達性確認（Gmail / Outlook / 携帯キャリア）
+- [ ] 本番リリース直前にテスト用 Order / AccessToken / Invoice を削除
