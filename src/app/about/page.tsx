@@ -1,54 +1,69 @@
-
-
 import Link from "next/link";
-import Image from "next/image";
 
 export default function AboutPage() {
   return (
-    <div className="bg-white px-6 py-12 max-w-3xl mx-auto rounded-lg shadow mt-8">
-      <h1 className="text-3xl font-bold mb-4">写真家について</h1>
-      <div className="flex flex-col md:flex-row items-start mb-8">
-        <Image
-          src="/hawk.jpg"
-          alt="写真家のプロフィール写真"
-          width={200}
-          height={200}
-          className="rounded-full shadow"
-        />
-        <p className="text-lg text-gray-700 mt-4 md:mt-0 md:ml-6">
-          写真家：高橋伸和<br />
-          経歴：複数の会社の立ち上げ、経営と並行してフリーランスの写真家として活動。風景、花、マクロ写真を中心に作品を制作。<br />
+    <main className="bg-neutral-50 py-12 sm:py-16">
+      <div className="mx-auto flex max-w-3xl flex-col gap-10 rounded-3xl bg-white px-6 py-10 shadow-sm ring-1 ring-black/5 sm:px-10">
+        <header className="space-y-3 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+            Momentiaについて
+          </h1>
+          <p className="text-sm text-neutral-600 sm:text-base">
+            Momentia は Evoluzio Inc. が運営するフォトレーベルです。静けさや余白を感じる瞬間を写真で切り取り、空間に寄り添うアートとしてお届けしています。
+          </p>
+        </header>
 
-        </p>
+        <section className="space-y-3">
+          <h2 className="text-2xl font-semibold text-neutral-900">ビジョン</h2>
+          <p className="text-sm leading-relaxed text-neutral-700 sm:text-base">
+            何気ない風景やかすかな光にも、心を整えてくれる力が宿っています。Momentia は、その小さな感動を丁寧に掬い上げ、暮らしやオフィスに持ち運べる形へと仕立てます。写真がひとつあるだけで会話が生まれ、場の空気が変わる。その体験を多くの人に届けたいと考えています。
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-2xl font-semibold text-neutral-900">制作とプリント</h2>
+          <p className="text-sm leading-relaxed text-neutral-700 sm:text-base">
+            作品は撮影からレタッチ、プリントまで一貫してこだわり抜いています。デジタルデータは長辺 2400px を標準とし、パネル作品は信頼するプロラボでプリントし丁寧に仕上げています。企業の会議室や店舗、そして個人のリビングにも馴染むよう、過度な装飾を避けたニュートラルな表現を大切にしています。
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-2xl font-semibold text-neutral-900">フォトグラファー</h2>
+          <p className="text-sm leading-relaxed text-neutral-700 sm:text-base">
+            Momentia には複数のフォトグラファーが参加し、それぞれの視点から作品を発表しています。最新の参加メンバーや略歴は下記のページからご覧ください。
+          </p>
+          <div>
+            <Link
+              href="/photographers"
+              className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+            >
+              フォトグラファー紹介を見る
+            </Link>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-2xl font-semibold text-neutral-900">オーダーについて</h2>
+          <p className="text-sm leading-relaxed text-neutral-700 sm:text-base">
+            デジタルデータのライセンス販売に加え、A2 パネルを中心としたプリント作品をご用意しています。導入のご相談や特別なサイズでの制作など、柔軟に対応いたします。
+          </p>
+        </section>
+
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link
+            href="/gallery"
+            className="inline-flex items-center rounded-full bg-black px-5 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+          >
+            ギャラリーを見る
+          </Link>
+          <Link
+            href="/contact"
+            className="inline-flex items-center rounded-full border border-neutral-300 px-5 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
+          >
+            お問い合わせ
+          </Link>
+        </div>
       </div>
-
-      <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-2">理念</h2>
-        <p className="text-gray-700">
-          「Momentia」は、光と時間の呼吸を感じる写真を通じて、静けさと美しさを届けることを目指しています。日常の中に潜む小さな感動を切り取り、心に残る瞬間を共有します。<br />
-          
-        </p>
-      </section>
-
-      <section className="mb-12">
-        <h2 className="text-2xl font-semibold mb-2">制作・額装ポリシー</h2>
-        <p className="text-gray-700">
-          日本には、まだ写真をプリントアウトし、飾って楽しむ文化が根付いていないと感じています。<br />
-          例えば会社の会議室、一枚の写真があるだけで空間の印象は変わり、この一枚の写真から会話が生まれ、コミュニケーションが活性化します。<br />
-          そのため、私たちは作品を大切に扱い、プロがプリントした写真を届けることにより多くの人に写真の魅力を伝えたいと考えています。<br />
-          Momentiaは、こうした理念のもと、写真を通じて人々の心に残る体験を提供します。<br />
-          企業の応接室や会議室の壁を飾ることを目途としていますが、もちろん個人の方も大歓迎です。<br />
-        </p>
-      </section>
-
-      <div className="flex justify-center">
-        <Link
-          href="/"
-          className="inline-block bg-black text-white px-6 py-3 rounded shadow hover:bg-gray-800 transition"
-        >
-          作品を見る
-        </Link>
-      </div>
-    </div>
+    </main>
   );
 }

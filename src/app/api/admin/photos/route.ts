@@ -158,9 +158,9 @@ export async function GET(req: Request) {
   try {
     const photos = (await prisma.photo.findMany({
       orderBy: { createdAt: "desc" },
-      include: { variants: true, keywords: true },
+      include: { variants: true, keywords: true, photographer: true },
       take: 200,
-    })) as Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }>[];
+    })) as Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true; photographer: true } }>[];
 
     const items = await Promise.all(
       photos.map(async (p) => {
@@ -177,6 +177,15 @@ export async function GET(req: Request) {
           priceDigitalJPY: p.priceDigitalJPY ?? null,
           pricePrintA2JPY: p.pricePrintA2JPY ?? null,
           keywords: p.keywords?.map((k) => k.word) ?? [],
+          photographerId: p.photographerId ?? null,
+          photographer: p.photographer
+            ? {
+                id: p.photographer.id,
+                slug: p.photographer.slug,
+                name: p.photographer.name,
+                displayName: p.photographer.displayName,
+              }
+            : null,
           urls: {
             original: await getSignedUrl(p.storagePath),
             thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,

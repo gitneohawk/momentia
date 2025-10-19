@@ -25,6 +25,12 @@ model Photo {
   pricePrintA2JPY Int @default(55000)
   sellDigital     Boolean  @default(true)
   sellPanel       Boolean  @default(true)
+
+  // --- Photographer relation (multi-artist ready) ---
+  photographerId String?
+  photographer   Photographer? @relation(fields: [photographerId], references: [id], onDelete: SetNull)
+
+  @@index([photographerId])
 }
 
 model Variant {
@@ -45,6 +51,23 @@ model Keyword {
   Photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
 
   @@index([word])
+}
+
+model Photographer {
+  id            String   @id @default(cuid())
+  slug          String   @unique              // URL 用スラッグ（例: hawk, ayaka）
+  name          String                         // 表示名（必須）
+  displayName   String?                        // 任意の別名
+  bio           String?   @db.Text             // 紹介文
+  profileUrl    String?                        // プロフィール画像 URL（任意）
+  website       String?
+  contactEmail  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  photos        Photo[]
+
+  @@index([name])
 }
 
 model Post {

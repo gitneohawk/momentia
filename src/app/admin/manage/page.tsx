@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useSession, signIn, } from "next-auth/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { signIn, useSession } from "next-auth/react";
 
 type Item = {
   slug: string;
@@ -14,7 +14,24 @@ type Item = {
   pricePrintA2JPY?: number | null;
   sellDigital: boolean;
   sellPanel: boolean;
+  photographerId: string | null;
+  photographer:
+    | {
+        id: string;
+        slug: string;
+        name: string;
+        displayName?: string | null;
+      }
+    | null;
   urls: { thumb: string | null; large: string | null; original: string };
+};
+
+type Photographer = {
+  id: string;
+  slug: string;
+  name: string;
+  displayName?: string | null;
+  contactEmail?: string | null;
 };
 
 function TagEditor({
@@ -87,6 +104,7 @@ export default function AdminManagePage() {
   const { status } = useSession();
 
   const [items, setItems] = useState<Item[]>([]);
+  const [photographers, setPhotographers] = useState<Photographer[]>([]);
   const allTagSuggestions = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) for (const k of it.keywords || []) set.add(k);
@@ -94,8 +112,21 @@ export default function AdminManagePage() {
   }, [items]);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [filterPhotographerId, setFilterPhotographerId] = useState<string>("");
 
-  const refresh = async () => {
+  const loadPhotographers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/photographers", { cache: "no-store" });
+      const raw = await res.text();
+      const json = raw ? JSON.parse(raw) : null;
+      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+      setPhotographers(Array.isArray(json?.items) ? (json.items as Photographer[]) : []);
+    } catch (err) {
+      console.error("[admin/manage] load photographers failed:", err);
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
     setMsg(null);
     try {
       const res = await fetch("/api/admin/photos", { cache: "no-store" });
@@ -107,17 +138,29 @@ export default function AdminManagePage() {
         keywords: Array.isArray(x?.keywords) ? x.keywords : [],
         sellDigital: typeof x?.sellDigital === "boolean" ? x.sellDigital : true,
         sellPanel: typeof x?.sellPanel === "boolean" ? x.sellPanel : true,
+        photographerId: typeof x?.photographerId === "string" ? x.photographerId : null,
+        photographer: x?.photographer
+          ? {
+              id: x.photographer.id,
+              slug: x.photographer.slug,
+              name: x.photographer.name,
+              displayName: x.photographer.displayName ?? null,
+            }
+          : null,
       }));
       setItems(arr as Item[]);
+      await loadPhotographers();
     } catch (err: any) {
       setItems([]);
       setMsg(err?.message || String(err));
     }
-  };
+  }, [loadPhotographers]);
 
   useEffect(() => {
-    if (status === "authenticated") refresh();
-  }, [status]);
+    if (status === "authenticated") {
+      void refresh();
+    }
+  }, [status, refresh]);
 
   const saveCaption = async (slug: string, caption: string) => {
     setBusy(slug);
@@ -209,6 +252,47 @@ export default function AdminManagePage() {
     setItems((prev) => prev.map((p) => (p.slug === slug ? { ...p, keywords: tags } : p)));
   };
 
+  const assignPhotographer = async (slug: string, photographerId: string | null) => {
+    setBusy(slug);
+    try {
+      const res = await fetch(`/api/admin/photo/${slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photographerId }),
+      });
+      const raw = await res.text();
+      const json = raw ? JSON.parse(raw) : null;
+      setBusy(null);
+      if (!res.ok) {
+        setMsg(json?.error || "Photographer update failed");
+        return;
+      }
+      const updated = json?.photo;
+      setItems((prev) =>
+        prev.map((p) =>
+          p.slug === slug
+            ? {
+                ...p,
+                photographerId: updated?.photographerId ?? photographerId ?? null,
+                photographer: updated?.photographer
+                  ? {
+                      id: updated.photographer.id,
+                      slug: updated.photographer.slug,
+                      name: updated.photographer.name,
+                      displayName: updated.photographer.displayName ?? null,
+                    }
+                  : null,
+              }
+            : p
+        )
+      );
+      setMsg("Photographer saved");
+    } catch (err: any) {
+      setBusy(null);
+      setMsg(err?.message || String(err));
+    }
+  };
+
   const remove = async (slug: string) => {
     if (!confirm(`Delete ${slug}? This removes blobs & DB rows.`)) return;
     setBusy(slug);
@@ -234,6 +318,10 @@ export default function AdminManagePage() {
     );
   }
 
+  const filteredItems = filterPhotographerId
+    ? items.filter((it) => (it.photographerId || "") === filterPhotographerId)
+    : items;
+
   return (
     <section className="grid gap-6">
       <header className="flex items-end justify-between">
@@ -241,7 +329,19 @@ export default function AdminManagePage() {
           <h1 className="text-2xl font-semibold tracking-tight">Admin: Manage</h1>
           <p className="text-sm text-neutral-600">編集・削除（Entra ID 保護中）</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <select
+            value={filterPhotographerId}
+            onChange={(e) => setFilterPhotographerId(e.currentTarget.value)}
+            className="rounded border border-neutral-300 px-2 py-1 text-sm"
+          >
+            <option value="">すべての写真家</option>
+            {photographers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.displayName || p.name}
+              </option>
+            ))}
+          </select>
           <button onClick={refresh} className="border px-3 py-1.5 rounded text-sm">Reload</button>
         </div>
       </header>
@@ -249,7 +349,7 @@ export default function AdminManagePage() {
       {msg && <div className="text-sm text-neutral-500">{msg}</div>}
 
       <ul className="grid gap-4">
-        {items.map((it) => (
+        {filteredItems.map((it) => (
           <li key={it.slug} className="flex gap-4 border rounded p-3">
             <img
               src={it.urls.thumb ?? it.urls.large ?? it.urls.original}
@@ -305,6 +405,31 @@ export default function AdminManagePage() {
                   if (v !== (it.caption ?? "")) saveCaption(it.slug, v);
                 }}
               />
+
+              {/* Photographer selection */}
+              <div className="grid gap-1">
+                <label className="text-sm text-neutral-600">Photographer</label>
+                <select
+                  value={it.photographerId ?? ""}
+                  onChange={(e) =>
+                    assignPhotographer(it.slug, e.currentTarget.value ? e.currentTarget.value : null)
+                  }
+                  disabled={busy === it.slug}
+                  className="w-full rounded border border-neutral-300 px-2 py-1 text-sm"
+                >
+                  <option value="">未設定</option>
+                  {photographers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.displayName || p.name} ({p.slug})
+                    </option>
+                  ))}
+                </select>
+                {it.photographer && (
+                  <p className="text-xs text-neutral-500">
+                    現在: {it.photographer.displayName || it.photographer.name}（slug: {it.photographer.slug}）
+                  </p>
+                )}
+              </div>
 
               {/* タグ（カテゴリ） */}
               <div className="grid gap-1">
@@ -362,6 +487,11 @@ export default function AdminManagePage() {
             </div>
           </li>
         ))}
+        {filteredItems.length === 0 && (
+          <li className="border rounded p-4 text-sm text-neutral-500">
+            該当する写真がありません。
+          </li>
+        )}
       </ul>
 
       {msg && <div className="text-sm text-neutral-500">{msg}</div>}

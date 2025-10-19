@@ -54,7 +54,7 @@ const API_TTL_SEC =
 const API_SWR_SEC =
   Number(process.env.API_PHOTOS_SWR_SEC ?? (process.env.NODE_ENV === "production" ? 60 : 0));
 
-type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true } }> & {
+type PhotoWithRels = Prisma.PhotoGetPayload<{ include: { variants: true; keywords: true; photographer: true } }> & {
   sellDigital?: boolean | null;
   sellPanel?: boolean | null;
 };
@@ -104,7 +104,6 @@ function getPublicBase(endpoint: string) {
 // info log helper: mute in production unless explicitly enabled
 const logInfo = (...args: any[]) => {
   if (process.env.DEBUG_API_PHOTOS === "1" || process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
     (console.info as any)(...args);
   }
 };
@@ -125,7 +124,10 @@ export async function GET(req: Request) {
   const rawLimit = Number(searchParams.get("limit") ?? 100);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 100;
   const q = (searchParams.get("q")?.trim() || '').slice(0, 120);
-  const kw = (searchParams.get("keyword")?.trim() || '').slice(0, 64);
+  const kw = (searchParams.get("keyword")?.trim() || "").slice(0, 64);
+  const rawPhotographer = (searchParams.get("photographer")?.trim() || "").toLowerCase();
+  const photographerSlug =
+    rawPhotographer && /^[a-z0-9-]{1,120}$/.test(rawPhotographer) ? rawPhotographer : null;
 
   const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
   const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1] ?? null;
@@ -239,19 +241,28 @@ export async function GET(req: Request) {
     }
   };
 
-  logInfo("[/api/photos] request", { q, kw, limit });
+  logInfo("[/api/photos] request", { q, kw, limit, photographer: photographerSlug });
 
   let photos: PhotoWithRels[] = [];
   try {
     photos = await prisma.photo.findMany({
       where: {
-        AND: [ { published: true },
-          q ? { OR: [{ caption: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }] } : {},
+        AND: [
+          { published: true },
+          q
+            ? {
+                OR: [
+                  { caption: { contains: q, mode: "insensitive" } },
+                  { slug: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {},
           kw ? { keywords: { some: { word: { equals: kw, mode: "insensitive" } } } } : {},
+          photographerSlug ? { photographer: { slug: photographerSlug } } : {},
         ],
       },
       orderBy: { createdAt: "desc" },
-      include: { variants: true, keywords: true },
+      include: { variants: true, keywords: true, photographer: true },
       take: limit,
     });
   } catch (err) {
@@ -264,14 +275,24 @@ export async function GET(req: Request) {
     const large = p.variants.find((v: Variant) => v.type === "large");
     const wmName = `${p.slug}_wm_2048_v1.jpg`;
     return {
-      slug: p.slug, width: thumb ? thumb.width : p.width,
+      slug: p.slug,
+      width: thumb ? thumb.width : p.width,
       height: thumb ? thumb.height : p.height,
       caption: p.caption,
-      capturedAt: p.capturedAt, keywords: p.keywords.map((k: Keyword) => k.word),
+      capturedAt: p.capturedAt,
+      keywords: p.keywords.map((k: Keyword) => k.word),
       priceDigitalJPY: p.priceDigitalJPY ?? null,
       pricePrintA2JPY: p.pricePrintA2JPY ?? null,
       sellDigital: p.sellDigital ?? true,
       sellPanel: p.sellPanel ?? true,
+      photographer: p.photographer
+        ? {
+            id: p.photographer.id,
+            slug: p.photographer.slug,
+            name: p.photographer.name,
+            displayName: p.photographer.displayName ?? null,
+          }
+        : null,
       urls: {
         thumb: thumb ? await getSignedUrl(thumb.storagePath, SIGNED_TTL_MIN) : null,
         large: large ? await getSignedUrl(large.storagePath, SIGNED_TTL_MIN) : null,

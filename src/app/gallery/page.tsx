@@ -13,6 +13,8 @@ import "yet-another-react-lightbox/plugins/thumbnails.css";
 
 export const dynamic = "force-dynamic";
 
+const SLUG_PATTERN = /^[a-z0-9-]{1,120}$/;
+
 // ===== Types =====
 type Item = {
   slug: string;
@@ -24,7 +26,21 @@ type Item = {
   pricePrintA2JPY?: number | null;
   sellDigital?: boolean;
   sellPanel?: boolean;
+  photographer?: {
+    id: string;
+    slug: string;
+    name: string;
+    displayName?: string | null;
+  } | null;
   urls: { thumb: string | null; large: string | null; watermarked?: string | null };
+};
+
+type Photographer = {
+  id: string;
+  slug: string;
+  name: string;
+  displayName?: string | null;
+  profileUrl?: string | null;
 };
 
 // ===== Small helpers =====
@@ -42,26 +58,76 @@ function GalleryPageInner() {
   const router = useRouter();
   const params = useSearchParams();
   const openSlug = params.get("open");
+  const initialPhotographer = (() => {
+    const slug = params.get("photographer");
+    return slug && SLUG_PATTERN.test(slug) ? slug : "all";
+  })();
   const [items, setItems] = useState<Item[]>([]);
+  const [photographers, setPhotographers] = useState<Photographer[]>([]);
+  const [selectedPhotographer, setSelectedPhotographer] = useState<string>(initialPhotographer);
   const [index, setIndex] = useState<number | -1>(-1);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const vw = useViewportWidth();
   const rowH = vw < 640 ? 150 : vw < 900 ? 170 : vw < 1280 ? 200 : 220;
   const preloaded = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    const slug = params.get("photographer");
+    const normalized = slug && SLUG_PATTERN.test(slug) ? slug : "all";
+    setSelectedPhotographer((prev) => (prev === normalized ? prev : normalized));
+  }, [params]);
+  useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/photos", { cache: "no-store" });
+        const res = await fetch("/api/photographers", { cache: "no-store" });
+        const raw = await res.text();
+        const json = raw ? JSON.parse(raw) : { items: [] };
+        if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+        setPhotographers(Array.isArray(json.items) ? (json.items as Photographer[]) : []);
+      } catch (e) {
+        console.error("[gallery] failed to load photographers", e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError(null);
+    setItems([]);
+    preloaded.current.clear();
+
+    (async () => {
+      try {
+        const qs = new URLSearchParams();
+        if (selectedPhotographer !== "all") qs.set("photographer", selectedPhotographer);
+        const query = qs.toString();
+        const res = await fetch(`/api/photos${query ? `?${query}` : ""}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const raw = await res.text();
         const json = raw ? JSON.parse(raw) : { items: [] };
         if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
         setItems((json.items ?? []) as Item[]);
       } catch (e: any) {
+        if (controller.signal.aborted) return;
+        setItems([]);
         setError(String(e?.message || e));
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     })();
-  }, []);
+
+    return () => controller.abort();
+  }, [selectedPhotographer]);
+
+  useEffect(() => {
+    setIndex(-1);
+  }, [selectedPhotographer]);
 
   const visibleItems = useMemo(() => items.filter((i) => i.urls.thumb && i.urls.large), [items]);
 
@@ -76,6 +142,8 @@ function GalleryPageInner() {
     const head = document.head;
     if (!head) return;
 
+    const cache = preloaded.current;
+
     const preloadTargets = visibleItems
       .slice(0, 6)
       .map((item) => item.urls.thumb ?? item.urls.large)
@@ -83,23 +151,40 @@ function GalleryPageInner() {
 
     const created: Array<{ src: string; el: HTMLLinkElement }> = [];
     for (const src of preloadTargets) {
-      if (preloaded.current.has(src)) continue;
+      if (cache.has(src)) continue;
       const link = document.createElement("link");
       link.rel = "preload";
       link.as = "image";
       link.href = src;
       head.appendChild(link);
-      preloaded.current.add(src);
+      cache.add(src);
       created.push({ src, el: link });
     }
 
     return () => {
       for (const { src, el } of created) {
         if (el.parentNode === head) head.removeChild(el);
-        preloaded.current.delete(src);
+        cache.delete(src);
       }
     };
   }, [visibleItems]);
+
+  const { filterOptions, shouldShowFilter } = useMemo(() => {
+    const options = photographers.map((p) => ({
+      slug: p.slug,
+      label: p.displayName || p.name,
+    }));
+    const optionSlugs = new Set(options.map((o) => o.slug));
+    const hasSelected = selectedPhotographer === "all" || optionSlugs.has(selectedPhotographer);
+    const extra =
+      !hasSelected && selectedPhotographer !== "all"
+        ? [{ slug: selectedPhotographer, label: selectedPhotographer }]
+        : [];
+    const list = [{ slug: "all", label: "All Photographers" }, ...extra, ...options];
+    const showFilter =
+      optionSlugs.size > 1 && !(selectedPhotographer !== "all" && optionSlugs.has(selectedPhotographer));
+    return { filterOptions: list, shouldShowFilter: showFilter };
+  }, [photographers, selectedPhotographer]);
 
   const photos = visibleItems.map((i) => ({
     key: i.slug,
@@ -109,6 +194,21 @@ function GalleryPageInner() {
     largeSrc: i.urls.large as string,
     caption: i.caption ?? "",
   }));
+
+  const handlePhotographerSelect = (slug: string) => {
+    const next = slug === "all" ? "all" : slug;
+    if (next === selectedPhotographer) return;
+    setSelectedPhotographer(next);
+    const nextParams = new URLSearchParams(params.toString());
+    nextParams.delete("open");
+    if (next === "all") {
+      nextParams.delete("photographer");
+    } else {
+      nextParams.set("photographer", next);
+    }
+    const query = nextParams.toString();
+    router.push(`/gallery${query ? `?${query}` : ""}`, { scroll: false });
+  };
 
   const active = index >= 0 ? visibleItems[index] : null;
   const priceDigital = (active?.priceDigitalJPY ?? 11000) as number;
@@ -155,13 +255,40 @@ function GalleryPageInner() {
           </div>
         </div>
 
+        {/* Photographer filter */}
+        {shouldShowFilter && (
+          <div className="flex flex-wrap items-center gap-2">
+            {filterOptions.map((option) => {
+              const active = selectedPhotographer === option.slug;
+              return (
+                <button
+                  key={option.slug}
+                  type="button"
+                  onClick={() => handlePhotographerSelect(option.slug)}
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition ${
+                    active
+                      ? "bg-black text-white shadow-sm"
+                      : "bg-white text-neutral-700 ring-1 ring-black/10 hover:bg-neutral-100"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Loading skeleton */}
-        {items.length === 0 && !error && (
+        {isLoading && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-neutral-200" />
             ))}
           </div>
+        )}
+
+        {!isLoading && !error && visibleItems.length === 0 && (
+          <div className="text-sm text-neutral-600">該当する作品がありません。</div>
         )}
 
         {error && <div className="text-sm text-red-600">{error}</div>}
@@ -191,7 +318,14 @@ function GalleryPageInner() {
           slides={visibleItems.map((i) => ({
             // Always go through the WM API so it can return existing WM or generate on demand
             src: wmSrc(i.slug),
-            description: i.caption ?? "",
+            description: [
+              i.caption ? String(i.caption) : null,
+              i.photographer
+                ? `Photographer: ${i.photographer.displayName || i.photographer.name}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" / "),
           }))}
           animation={{ fade: 250 }}
           controller={{ closeOnPullDown: true, closeOnBackdropClick: false }}
