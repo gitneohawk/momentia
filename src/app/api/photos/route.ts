@@ -273,7 +273,6 @@ export async function GET(req: Request) {
       sellDigital: p.sellDigital ?? true,
       sellPanel: p.sellPanel ?? true,
       urls: {
-        original: await getSignedUrl(p.storagePath, SIGNED_TTL_MIN),
         thumb: thumb ? await getSignedUrl(thumb.storagePath, SIGNED_TTL_MIN) : null,
         large: large ? await getSignedUrl(large.storagePath, SIGNED_TTL_MIN) : null,
         watermarked: await getSignedUrl(wmName, SIGNED_TTL_MIN, "watermarks"),

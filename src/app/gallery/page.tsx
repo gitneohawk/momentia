@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PhotoAlbum from "react-photo-album";
@@ -24,7 +24,7 @@ type Item = {
   pricePrintA2JPY?: number | null;
   sellDigital?: boolean;
   sellPanel?: boolean;
-  urls: { thumb: string | null; large: string | null; watermarked?: string | null; original?: string };
+  urls: { thumb: string | null; large: string | null; watermarked?: string | null };
 };
 
 // ===== Small helpers =====
@@ -62,13 +62,13 @@ function GalleryPageInner() {
     })();
   }, []);
 
-  useEffect(() => {
-    if (!openSlug || items.length === 0) return;
-    const idx = items.findIndex(i => i.slug === openSlug);
-    if (idx >= 0) setIndex(idx);
-  }, [openSlug, items]);
+  const visibleItems = useMemo(() => items.filter((i) => i.urls.thumb && i.urls.large), [items]);
 
-  const visibleItems = items.filter((i) => i.urls.thumb && i.urls.large);
+  useEffect(() => {
+    if (!openSlug || visibleItems.length === 0) return;
+    const idx = visibleItems.findIndex((i) => i.slug === openSlug);
+    setIndex(idx >= 0 ? idx : -1);
+  }, [openSlug, visibleItems]);
 
   const photos = visibleItems.map((i) => ({
     key: i.slug,

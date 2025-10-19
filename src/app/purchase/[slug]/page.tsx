@@ -15,7 +15,7 @@ type Item = {
   pricePrintA2JPY?: number;
   sellDigital?: boolean;
   sellPanel?: boolean;
-  urls: { thumb: string | null; large: string | null; original: string; watermarked: string };
+  urls: { thumb: string | null; large: string | null; watermarked: string | null };
 };
 
 export default function PurchasePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -95,6 +95,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   const canDigital = flagsProvided ? !!rawD : true;
   const canPanel = flagsProvided ? !!rawP : true;
   const hasAnyPurchase = canDigital || canPanel;
+  const heroSrc = item?.urls.watermarked ?? item?.urls.large ?? item?.urls.thumb ?? null;
 
   if (loading || !slug) {
     return (
@@ -133,13 +134,19 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
       <div className="grid lg:grid-cols-2 gap-8 items-start">
         {/* プレビュー */}
         <div className="rounded-2xl overflow-hidden bg-neutral-100 ring-1 ring-black/10">
-          <img
-            src={item.urls.watermarked ?? item.urls.large ?? item.urls.original}
-            alt={item.slug}
-            className="w-full h-auto block"
-            loading="eager"
-            decoding="async"
-          />
+          {heroSrc ? (
+            <img
+              src={heroSrc}
+              alt={item.slug}
+              className="w-full h-auto block"
+              loading="eager"
+              decoding="async"
+            />
+          ) : (
+            <div className="aspect-[4/3] w-full bg-neutral-200 flex items-center justify-center text-neutral-500 text-sm">
+              画像を表示できません
+            </div>
+          )}
         </div>
 
         {/* 情報 & CTA */}

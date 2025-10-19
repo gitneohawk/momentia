@@ -77,7 +77,6 @@ export async function GET(
       sellDigital: photo.sellDigital ?? true,
       sellPanel: photo.sellPanel ?? true,
       urls: {
-        original: await getSignedUrl(photo.storagePath, "photos"),
         thumb: thumb ? await getSignedUrl(thumb.storagePath, "photos") : null,
         large: large ? await getSignedUrl(large.storagePath, "photos") : null,
         watermarked: `/api/wm/${photo.slug}`,

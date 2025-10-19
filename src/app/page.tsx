@@ -13,7 +13,7 @@ type Item = {
   caption: string | null;
   capturedAt: string | null;
   keywords: string[];
-  urls: { thumb: string | null; large: string | null; original: string };
+  urls: { thumb: string | null; large: string | null; watermarked?: string | null };
 };
 
 export const revalidate = 60;
@@ -79,8 +79,9 @@ export default async function Home() {
           </header>
 
           <div className="-m-2 flex flex-wrap">
-            {featured.map((p, index) => {
-                const _src = p.urls.thumb || p.urls.large || p.urls.original;
+            {featured.map((p) => {
+                const displaySrc = p.urls.thumb ?? p.urls.large ?? p.urls.watermarked ?? null;
+                if (!displaySrc) return null;
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">
                   <Link
@@ -91,7 +92,7 @@ export default async function Home() {
                         <img
                       decoding="async"
                       loading="eager"
-                      src={_src}
+                      src={displaySrc}
                       alt={p.caption ?? p.slug}
                       className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
                     />
