@@ -3,6 +3,8 @@ import { EmailClient } from "@azure/communication-email";
 
 let cachedClient: EmailClient | null = null;
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function getClient(): EmailClient {
   if (cachedClient) return cachedClient;
   const conn =
@@ -15,6 +17,25 @@ function getClient(): EmailClient {
   }
   cachedClient = new EmailClient(conn);
   return cachedClient;
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? Math.floor(num) : fallback;
+}
+
+function extractStatus(err: any): number | null {
+  if (typeof err?.statusCode === "number") return err.statusCode;
+  if (typeof err?.status === "number") return err.status;
+  if (typeof err?.response?.status === "number") return err.response.status;
+  return null;
+}
+
+function isRetryable(err: any): boolean {
+  const status = extractStatus(err);
+  if (status == null) return false;
+  if (status >= 500) return true;
+  return status === 429;
 }
 
 type SendMailArgs = {
@@ -45,60 +66,83 @@ export async function sendMail({
   const replyToAddr = replyTo || process.env.MAIL_REPLY_TO || "info@evoluzio.com";
 
   const client = getClient();
-  const startedAt = Date.now();
+  const maxAttempts = parsePositiveInt(process.env.MAIL_RETRY_ATTEMPTS, 3);
+  const baseDelayMs = parsePositiveInt(process.env.MAIL_RETRY_BASE_DELAY_MS, 500);
 
-  try {
-    const poller = await client.beginSend({
-      senderAddress: from,
-      content: text ? { subject, html, plainText: text } : { subject, html },
-      recipients: { to: [{ address: to }] },
-      replyTo: [{ address: replyToAddr }],
-    });
+  let attempt = 0;
+  let lastError: unknown = null;
 
-    const result = await poller.pollUntilDone();
-    const durationMs = Date.now() - startedAt;
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    const startedAt = Date.now();
 
-    // Best-effort extraction
-    const messageId = (result as any)?.id ?? (result as any)?.messageId ?? null;
-    const status = (result as any)?.status ?? "Unknown";
+    try {
+      const poller = await client.beginSend({
+        senderAddress: from,
+        content: text ? { subject, html, plainText: text } : { subject, html },
+        recipients: { to: [{ address: to }] },
+        replyTo: [{ address: replyToAddr }],
+      });
 
-    console.info(
-      JSON.stringify({
-        level: "info",
-        type: "mail.send",
-        provider: "acs",
-        to,
-        from,
-        replyTo: replyToAddr,
-        subject,
-        status,
-        messageId,
-        durationMs,
-      })
-    );
+      const result = await poller.pollUntilDone();
+      const durationMs = Date.now() - startedAt;
 
-    if ((result as any)?.error) {
-      throw new Error((result as any).error.message ?? "Email send failed");
+      // Best-effort extraction
+      const messageId = (result as any)?.id ?? (result as any)?.messageId ?? null;
+      const status = (result as any)?.status ?? "Unknown";
+
+      console.info(
+        JSON.stringify({
+          level: "info",
+          type: "mail.send",
+          provider: "acs",
+          to,
+          from,
+          replyTo: replyToAddr,
+          subject,
+          status,
+          messageId,
+          durationMs,
+          attempt,
+        })
+      );
+
+      if ((result as any)?.error) {
+        throw new Error((result as any).error.message ?? "Email send failed");
+      }
+
+      return result;
+    } catch (err: any) {
+      lastError = err;
+      const durationMs = Date.now() - startedAt;
+      const retryable = isRetryable(err) && attempt < maxAttempts;
+
+      console.error(
+        JSON.stringify({
+          level: "error",
+          type: "mail.send.failed",
+          provider: "acs",
+          to,
+          from,
+          replyTo: replyToAddr,
+          subject,
+          durationMs,
+          attempt,
+          retryable,
+          error: err?.message || String(err),
+        })
+      );
+
+      if (!retryable) {
+        throw err;
+      }
+
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      await sleep(delay);
     }
-
-    return result;
-  } catch (err: any) {
-    const durationMs = Date.now() - startedAt;
-    console.error(
-      JSON.stringify({
-        level: "error",
-        type: "mail.send.failed",
-        provider: "acs",
-        to,
-        from,
-        replyTo: replyToAddr,
-        subject,
-        durationMs,
-        error: err?.message || String(err),
-      })
-    );
-    throw err;
   }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 export async function sendAdminMail(args: { subject: string; html: string; text?: string; replyTo?: string }) {

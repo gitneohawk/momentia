@@ -150,7 +150,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [ ] Stripe Webhook 失敗を Dashboard のアラートメールに追加
 - [ ] 監視設定の IaC 化（Bicep/Terraform もしくは `az monitor` スクリプト）
 - [ ] ACS 送信ログを Log Analytics に転送し、配信失敗割合のアラートを作成
-- [ ] Stripe Webhook のイベント処理ログに `orderId` / `customerEmail` を必ず含める（PIIは必要最小限）
+- [x] Stripe Webhook のイベント処理ログに `orderId` / `customerEmail` を必ず含める（PIIは必要最小限）
 - [x] 管理画面の注文一覧を JST 表示に統一
 - [ ] Stripe Webhook テスト手順をドキュメント化（Stripe CLI でのフォワード含む）
 - [ ] リリース前にテスト注文・AccessToken をクリアする手順を用意
@@ -166,7 +166,7 @@ tulip画像のA2プリント仕上がり確認（10月第2週予定）完了後�
 - [x] 決済完了通知メール（Stripe Webhook）
   - デジタル：ダウンロードURL（`/api/download?token=...`）を含む購入者メール＋運営通知
   - パネル：出荷目安テキストを含む購入者メール＋運営通知
-- [ ] リトライ：5xx 時の指数バックオフ（mailer.ts に実装）
+- [x] リトライ：5xx 時の指数バックオフ（mailer.ts に実装）
 - [ ] バウンス／配信失敗の検知とアラート（Log Analytics → アラート or メール）
 - [ ] 迷惑メール対策：本文と件名の調整、SPF/DKIM/DMARC の継続モニタリング（ACS 側ステータス）
 

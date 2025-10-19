@@ -73,17 +73,17 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
-  console.info("[STRIPE_WEBHOOK_RECEIVED]", { id: event.id, type: event.type });
+  console.info("[STRIPE_WEBHOOK_RECEIVED]", { eventId: event.id, type: event.type });
 
   // Drop duplicates (Stripe retries) quickly in-process; DB upsert is a second layer
   if (alreadyProcessed(event.id)) {
-    console.info('[STRIPE_WEBHOOK_DUPLICATE_IGNORED]', { id: event.id, type: event.type });
+    console.info('[STRIPE_WEBHOOK_DUPLICATE_IGNORED]', { eventId: event.id, type: event.type });
     return NextResponse.json({ received: true, duplicate: true });
   }
 
   // Allowlist events
   if (event.type !== 'checkout.session.completed') {
-    console.info('[STRIPE_WEBHOOK_IGNORED]', { id: event.id, type: event.type });
+    console.info('[STRIPE_WEBHOOK_IGNORED]', { eventId: event.id, type: event.type });
     return NextResponse.json({ received: true });
   }
 
@@ -106,13 +106,16 @@ export async function POST(req: Request) {
     const name = meta.name ?? null;
     const slug = meta.slug ?? null;
 
-    console.info("[STRIPE_WEBHOOK_PROCESSING]", {
-      id: event.id,
+    const logBase = {
+      eventId: event.id,
       type: event.type,
       orderId,
+      email,
       itemType,
       slug,
-    });
+    };
+
+    console.info("[STRIPE_WEBHOOK_PROCESSING]", logBase);
 
     // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
     const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
@@ -155,16 +158,12 @@ export async function POST(req: Request) {
       });
 
       console.info("[STRIPE_WEBHOOK_OK][DB_SAVED]", {
-        orderId: full.id,
-        itemType,
-        slug,
+        ...logBase,
         dbId: orderRecord.id,
       });
     } catch (dbErr) {
       console.error("[ALERT][STRIPE_WEBHOOK_ERROR][DB_SAVE_FAILED]", {
-        orderId: full.id,
-        itemType,
-        slug,
+        ...logBase,
         error: String(dbErr),
       });
       return new NextResponse("DB Error", { status: 500 });
@@ -237,7 +236,7 @@ export async function POST(req: Request) {
     try {
       const h = new URL(baseUrl).host.toLowerCase();
       if (!ALLOWED_HOSTS_WEB.has(h)) {
-        console.warn('[STRIPE_WEBHOOK_WARN][BASEURL_MISMATCH]', { host: h });
+        console.warn('[STRIPE_WEBHOOK_WARN][BASEURL_MISMATCH]', { ...logBase, host: h });
         // proceed without URLs to avoid leaking wrong host
       }
     } catch {
@@ -279,15 +278,14 @@ export async function POST(req: Request) {
           text: finalTextUser,
         });
         console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
-          orderId: full.id,
-          itemType,
+          ...logBase,
           to: maskEmail(email),
           accessTokenId,
         });
 
         if (_invoiceUrl) {
           console.info("[STRIPE_WEBHOOK_INFO][INVOICE_URL_ATTACHED]", {
-            orderId: full.id,
+            ...logBase,
             invoiceUrl: _invoiceUrl,
           });
         }
@@ -315,8 +313,7 @@ export async function POST(req: Request) {
             text: adminText,
           });
           console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
-            orderId: full.id,
-            itemType,
+            ...logBase,
             to: maskEmail(adminTo),
             invoiceUrl: _invoiceUrl,
           });
@@ -347,14 +344,13 @@ export async function POST(req: Request) {
           text: finalTextUser,
         });
         console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
-          orderId: full.id,
-          itemType,
+          ...logBase,
           to: maskEmail(email),
         });
 
         if (_invoiceUrl) {
           console.info("[STRIPE_WEBHOOK_INFO][INVOICE_URL_ATTACHED]", {
-            orderId: full.id,
+            ...logBase,
             invoiceUrl: _invoiceUrl,
           });
         }
@@ -382,8 +378,7 @@ export async function POST(req: Request) {
             text: adminText,
           });
           console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
-            orderId: full.id,
-            itemType,
+            ...logBase,
             to: maskEmail(adminTo),
             invoiceUrl: _invoiceUrl,
           });
@@ -392,8 +387,7 @@ export async function POST(req: Request) {
     } catch (mailErr) {
       // メール失敗はログのみ（Webhookは 200 を返す）
       console.error("[ALERT][STRIPE_WEBHOOK_ERROR][MAIL_FAILED]", {
-        orderId: typeof (event as any)?.data?.object?.id === "string" ? (event as any).data.object.id : undefined,
-        type: event.type,
+        ...logBase,
         error: String(mailErr),
       });
     }
