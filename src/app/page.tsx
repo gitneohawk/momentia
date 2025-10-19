@@ -13,6 +13,12 @@ type Item = {
   caption: string | null;
   capturedAt: string | null;
   keywords: string[];
+  photographer?: {
+    id: string;
+    slug: string;
+    name: string;
+    displayName?: string | null;
+  } | null;
   urls: { thumb: string | null; large: string | null; watermarked?: string | null };
 };
 
@@ -27,8 +33,8 @@ async function getFeatured(): Promise<Item[]> {
 
   // API を並列フェッチ（どちらかが失敗しても片方を使う）
   const [featResult, recentResult] = await Promise.allSettled([
-    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { cache: "force-cache" }),
-    fetch(`${baseUrl}/api/photos?limit=3`, { cache: "force-cache" }),
+    fetch(`${baseUrl}/api/photos?featured=1&limit=3`, { next: { revalidate: 120 } }),
+    fetch(`${baseUrl}/api/photos?limit=3`, { next: { revalidate: 120 } }),
   ]);
 
   let items: Item[] = [];
@@ -103,6 +109,11 @@ export default async function Home() {
                       {/* ホバーでキャプションが浮き上がるアニメーション */}
                       <div className="transform transition-transform duration-500 ease-in-out group-hover:-translate-y-2">
                         <p className="text-lg font-medium drop-shadow-md">{p.caption || "—"}</p>
+                        {p.photographer && (
+                          <p className="text-xs text-neutral-200/90">
+                            {p.photographer.displayName || p.photographer.name}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </Link>

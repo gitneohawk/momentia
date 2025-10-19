@@ -78,7 +78,7 @@ export async function GET(
     if (!validateSlug(slug)) return NextResponse.json({ error: "invalid slug" }, { status: 400 });
     const photo = await prisma.photo.findUnique({
       where: { slug },
-      include: { variants: true, keywords: true },
+      include: { variants: true, keywords: true, photographer: true },
     });
     if (!photo) return NextResponse.json({ error: "not found" }, { status: 404 });
     // Return full snapshot (sellDigital/sellPanel will be present if in schema)
@@ -170,6 +170,25 @@ export async function PATCH(
       incomingKeywords = cleaned.filter((s: string) => (seen.has(s) ? false : (seen.add(s), true)));
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "photographerId")) {
+      if (body.photographerId === null || body.photographerId === "") {
+        data.photographerId = null;
+      } else if (typeof body.photographerId === "string") {
+        const pid = body.photographerId.trim();
+        if (!pid) {
+          data.photographerId = null;
+        } else {
+          const exists = await prisma.photographer.findUnique({ where: { id: pid }, select: { id: true } });
+          if (!exists) {
+            return NextResponse.json({ error: "invalid photographerId" }, { status: 400 });
+          }
+          data.photographerId = pid;
+        }
+      } else {
+        return NextResponse.json({ error: "invalid photographerId" }, { status: 400 });
+      }
+    }
+
     if (!Object.keys(data).length && incomingKeywords === null) {
       return NextResponse.json({ error: "No valid fields" }, { status: 400 });
     }
@@ -196,7 +215,7 @@ export async function PATCH(
     // Return updated snapshot (including relations for client sync)
     const updated = await prisma.photo.findUnique({
       where: { slug },
-      include: { variants: true, keywords: true },
+      include: { variants: true, keywords: true, photographer: true },
     });
 
     return NextResponse.json({ ok: true, photo: updated });

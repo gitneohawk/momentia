@@ -55,7 +55,7 @@ export async function GET(
 
     const photo = await prisma.photo.findUnique({
       where: { slug, published: true },
-      include: { variants: true, keywords: true },
+      include: { variants: true, keywords: true, photographer: true },
     });
 
     if (!photo) {
@@ -76,6 +76,14 @@ export async function GET(
       pricePrintA2JPY: photo.pricePrintA2JPY ?? 55000,
       sellDigital: photo.sellDigital ?? true,
       sellPanel: photo.sellPanel ?? true,
+      photographer: photo.photographer
+        ? {
+            id: photo.photographer.id,
+            slug: photo.photographer.slug,
+            name: photo.photographer.name,
+            displayName: photo.photographer.displayName ?? null,
+          }
+        : null,
       urls: {
         thumb: thumb ? await getSignedUrl(thumb.storagePath, "photos") : null,
         large: large ? await getSignedUrl(large.storagePath, "photos") : null,

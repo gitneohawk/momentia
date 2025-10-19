@@ -15,6 +15,12 @@ type Item = {
   pricePrintA2JPY?: number;
   sellDigital?: boolean;
   sellPanel?: boolean;
+  photographer?: {
+    id: string;
+    slug: string;
+    name: string;
+    displayName?: string | null;
+  } | null;
   urls: { thumb: string | null; large: string | null; watermarked: string | null };
 };
 
@@ -153,6 +159,11 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
         <div className="grid gap-5">
           <div>
             <h2 className="text-lg font-medium">{item.caption || item.slug}</h2>
+            {item.photographer && (
+              <p className="text-sm text-neutral-500">
+                Photographer: {item.photographer.displayName || item.photographer.name}
+              </p>
+            )}
             {item.keywords?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {item.keywords.slice(0, 12).map((k) => (
