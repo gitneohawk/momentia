@@ -344,7 +344,7 @@ function GalleryPageInner() {
                           router.push(`/purchase/${active.slug}`);
                         } catch (e) {
                           log.error("Gallery navigation to purchase failed", {
-                            slug: item.slug,
+                            slug: active?.slug,
                             err: serializeError(e),
                           });
                         }
