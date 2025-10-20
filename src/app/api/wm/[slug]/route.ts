@@ -3,9 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getBlobServiceClient } from "@/lib/azure-storage";
 import sharp from "sharp";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const baseLog = logger.child({ module: "api/wm" });
 
 // --- 定数 & ヘルパー関数 ---
 const wmLimiter = createRateLimiter({ prefix: "wm", limit: 120, windowMs: 60_000 });
@@ -28,15 +31,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const url = req.nextUrl;
   const debugParam = url.searchParams.get(DEBUG_QUERY_KEY);
   const debug: boolean = debugParam === "1" || debugParam === "true";
-  const log = (...args: any[]) => { if (debug) console.log("[wm]", ...args); };
+  let slug: string | undefined;
+  const logDebug = (message: string, meta?: Record<string, unknown>) => {
+    if (debug) {
+      baseLog.info(message, { path: url.pathname, slug, ...meta });
+    }
+  };
   
-  log("Request start", { path: url.pathname });
+  logDebug("Request start");
   
   try {
     const { ok, resetSec } = await wmLimiter.hit(clientIp(req));
     if (!ok) { const r = NextResponse.json({ error: "rate_limited" }, { status: 429 }); r.headers.set("Retry-After", String(resetSec)); return r; }
     
-    const { slug } = await params;
+    ({ slug } = await params);
     if (!validateSlugStrict(slug)) { return new NextResponse("Bad Request", { status: 400 }); }
     
     const photo = await prisma.photo.findUnique({ where: { slug }, include: { variants: true } });
@@ -57,34 +65,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       try {
         const properties = await outBlobClient.getProperties();
         if (properties.contentLength) {
-          log("Cache hit", { outName });
+          logDebug("Cache hit", { outName });
           const downloadResponse = await outBlobClient.download();
           const cachedBuffer = await streamToBuffer(downloadResponse.readableStreamBody!);
           return new NextResponse(new Uint8Array(cachedBuffer), { status: 200, headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800" } });
         }
-      } catch (e: any) { if (e.statusCode !== 404) log("Cache check error", e.message); log("Cache miss", { outName }); }
+      } catch (e: any) { if (e.statusCode !== 404) logDebug("Cache check error", { error: e?.message || String(e) }); logDebug("Cache miss", { outName }); }
     }
     
     const photosContainerClient = blobServiceClient.getContainerClient(PHOTO_CONTAINER);
     const sourceBlobClient = photosContainerClient.getBlockBlobClient(sourcePath);
     const downloadResponse = await sourceBlobClient.download();
     const sourceBuffer = await streamToBuffer(downloadResponse.readableStreamBody!);
-    log("Source downloaded", { path: sourcePath, bytes: sourceBuffer.length });
+    logDebug("Source downloaded", { path: sourcePath, bytes: sourceBuffer.length });
     
     const image = sharp(sourceBuffer).rotate();
     const metadata = await image.metadata();
     const wmSvg = svgWatermark(WM_TEXT, metadata.width || widthOut);
     
     const composedBuffer = await image.resize({ width: widthOut, withoutEnlargement: true }).composite([{ input: wmSvg }]).jpeg({ quality: QUALITY, mozjpeg: true }).toBuffer();
-    log("Image composed with watermark", { bytes: composedBuffer.length });
+    logDebug("Image composed with watermark", { bytes: composedBuffer.length });
     
     await outBlobClient.uploadData(composedBuffer, { blobHTTPHeaders: { blobContentType: "image/jpeg", blobCacheControl: "public, max-age=31536000, immutable" } });
-    log("Cache uploaded", { outName });
+    logDebug("Cache uploaded", { outName });
     
     return new NextResponse(new Uint8Array(composedBuffer), { status: 200, headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800" } });
   
   } catch (e: any) {
-    console.error("[wm] Critical error:", e);
+    baseLog.error("Watermark generation handler failed", { slug, err: serializeError(e) });
     if (url.searchParams.get(DEBUG_QUERY_KEY) === "1") { return NextResponse.json({ error: "wm-failed", message: String(e?.message || e), stack: e.stack }, { status: 500 }); }
     return new NextResponse("Internal Server Error", { status: 500 });
   }

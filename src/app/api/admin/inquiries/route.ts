@@ -5,6 +5,7 @@ import { isAdminEmail } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 // 管理API: /api/admin/inquiries
 const MAX_JSON_BYTES = 32 * 1024; // 32KB
@@ -45,6 +46,8 @@ const patchSchema = z.object({
   status: z.enum(["NEW", "OPEN", "CLOSED"]),
 });
 
+const log = logger.child({ module: "api/admin/inquiries" });
+
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? "";
@@ -79,7 +82,7 @@ export async function GET(req: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (e) {
-    console.error(e);
+    log.error("Admin inquiries fetch failed", { err: serializeError(e) });
     return NextResponse.json({ ok: false }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }
@@ -119,7 +122,7 @@ export async function PATCH(req: Request) {
     if (e?.name === "ZodError") {
       return NextResponse.json({ ok: false, errors: e.flatten?.() }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
-    console.error(e);
+    log.error("Admin inquiries update failed", { err: serializeError(e) });
     return NextResponse.json({ ok: false }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

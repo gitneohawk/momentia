@@ -5,6 +5,7 @@ import xss from "xss"; // if not installed, keep fallback sanitizer below
 import { sendMail } from "@/lib/mailer";
 import { tplInquiryAutoReply, tplInquiryAdminNotice } from "@/lib/mail-templates";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 const MAX_BODY_BYTES = 16 * 1024; // 16KB body cap
 const ALLOWED_HOSTS = new Set([
@@ -58,6 +59,8 @@ const sanitize = (s: string) => xss(s, {
   stripIgnoreTag: true,
   stripIgnoreTagBody: ["script", "style"],
 });
+
+const log = logger.child({ module: "api/inquiry" });
 
 export async function POST(req: Request) {
   try {
@@ -159,11 +162,11 @@ export async function POST(req: Request) {
         html: auto.html,
       });
       autoReplySuccess = true;
-      console.info("[inquiry mail] auto-reply sent to user:", maskEmail(saved.email));
+      log.info("Inquiry auto-reply sent", { to: maskEmail(saved.email) });
     } catch (err) {
       autoReplySuccess = false;
       autoReplyError = err;
-      console.error("[inquiry mail error] auto-reply failed:", err);
+      log.error("Inquiry auto-reply failed", { to: maskEmail(saved.email), err: serializeError(err) });
     }
 
     // 運営宛 通知
@@ -186,9 +189,15 @@ export async function POST(req: Request) {
         html: admin.html + statusLineHtml,
       });
 
-      console.info("[inquiry mail] admin notice sent", { result: autoReplySuccess ? "succeeded" : "failed", user: maskEmail(saved.email) });
+      log.info("Inquiry admin notice sent", {
+        autoReply: autoReplySuccess ? "succeeded" : "failed",
+        user: maskEmail(saved.email),
+      });
     } catch (err) {
-      console.error("[inquiry mail error] admin notice failed:", err, "Auto-reply status:", autoReplySuccess ? "succeeded" : "failed");
+      log.error("Inquiry admin notice failed", {
+        autoReply: autoReplySuccess ? "succeeded" : "failed",
+        err: serializeError(err),
+      });
     }
 
     return NextResponse.json({ ok: true }, { status: 201, headers: { "Cache-Control": "no-store" } });
@@ -199,7 +208,7 @@ export async function POST(req: Request) {
         { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
-    console.error(e);
+    log.error("Inquiry handler failed", { err: serializeError(e) });
     return NextResponse.json({ ok: false }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

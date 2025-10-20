@@ -18,8 +18,10 @@ import { getToken } from 'next-auth/jwt';
 
 import { prisma } from '@/lib/prisma';
 import { createRateLimiter } from '@/lib/rate-limit';
+import { logger, serializeError } from "@/lib/logger";
 
 const checkoutLimiter = createRateLimiter({ prefix: 'checkout', limit: 60, windowMs: 60_000 });
+const log = logger.child({ module: "api/checkout" });
 
 export async function POST(req: NextRequest) {
   try {
@@ -93,14 +95,14 @@ export async function POST(req: NextRequest) {
     const allowedRaw = process.env.ALLOWED_CHECKOUT_EMAILS || '';
     const allowed = allowedRaw.split(',').map((s) => s.trim()).filter(Boolean);
     if (allowed.length > 0 && !allowed.includes(email)) {
-      console.warn('[checkout] blocked by ALLOWED_CHECKOUT_EMAILS', { email: maskEmail(email) });
+      log.warn("Checkout email blocked by allowlist", { email: maskEmail(email) });
       return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     }
 
     // ← ここで初期化（ビルド時には実行されない）
     const secret = process.env.STRIPE_SECRET_KEY;
     if (!secret) {
-      console.error('Missing STRIPE_SECRET_KEY at runtime');
+      log.error("Missing STRIPE_SECRET_KEY at runtime");
       return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
     }
     const stripe = new Stripe(secret);
@@ -149,7 +151,7 @@ export async function POST(req: NextRequest) {
       Number.isFinite(clientAmount) &&
       Math.abs(Number(clientAmount) - Number(priceFromDb)) > 0
     ) {
-      console.warn('[checkout] amount mismatch', {
+      log.warn("Checkout amount mismatch", {
         clientAmount,
         price: priceFromDb,
         slug: safeSlug,
@@ -188,7 +190,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
-    console.error('Stripe checkout error:', err);
+    log.error("Stripe checkout error", { err: serializeError(err) });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

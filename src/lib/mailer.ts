@@ -1,5 +1,6 @@
 // lib/mailer.ts
 import { EmailClient } from "@azure/communication-email";
+import { logger, serializeError } from "./logger";
 
 let cachedClient: EmailClient | null = null;
 
@@ -37,6 +38,14 @@ function isRetryable(err: any): boolean {
   if (status >= 500) return true;
   return status === 429;
 }
+
+const log = logger.child({ module: "lib/mailer" });
+
+const maskEmail = (value: string) => {
+  const [user, domain] = value.split("@");
+  if (!user || !domain) return value;
+  return `${user.slice(0, 1)}***@${domain}`;
+};
 
 type SendMailArgs = {
   to: string;
@@ -91,21 +100,17 @@ export async function sendMail({
       const messageId = (result as any)?.id ?? (result as any)?.messageId ?? null;
       const status = (result as any)?.status ?? "Unknown";
 
-      console.info(
-        JSON.stringify({
-          level: "info",
-          type: "mail.send",
-          provider: "acs",
-          to,
-          from,
-          replyTo: replyToAddr,
-          subject,
-          status,
-          messageId,
-          durationMs,
-          attempt,
-        })
-      );
+      log.info("Mail sent", {
+        provider: "acs",
+        to: maskEmail(to),
+        from: maskEmail(from),
+        replyTo: maskEmail(replyToAddr),
+        subjectPreview: subject.slice(0, 80),
+        status,
+        messageId,
+        durationMs,
+        attempt,
+      });
 
       if ((result as any)?.error) {
         throw new Error((result as any).error.message ?? "Email send failed");
@@ -117,21 +122,17 @@ export async function sendMail({
       const durationMs = Date.now() - startedAt;
       const retryable = isRetryable(err) && attempt < maxAttempts;
 
-      console.error(
-        JSON.stringify({
-          level: "error",
-          type: "mail.send.failed",
-          provider: "acs",
-          to,
-          from,
-          replyTo: replyToAddr,
-          subject,
-          durationMs,
-          attempt,
-          retryable,
-          error: err?.message || String(err),
-        })
-      );
+      log.error("Mail send failed", {
+        provider: "acs",
+        to: maskEmail(to),
+        from: maskEmail(from),
+        replyTo: maskEmail(replyToAddr),
+        subjectPreview: subject.slice(0, 80),
+        durationMs,
+        attempt,
+        retryable,
+        err: serializeError(err),
+      });
 
       if (!retryable) {
         throw err;

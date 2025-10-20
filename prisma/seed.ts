@@ -1,6 +1,8 @@
 // prisma/seed.ts
 import { PrismaClient } from "@prisma/client";
+import { logger, serializeError } from "@/lib/logger";
 const prisma = new PrismaClient();
+const log = logger.child({ module: "prisma/seed" });
 
 async function main() {
   // 既存を消すなら（必要なければコメントアウトのままでOK）
@@ -37,12 +39,12 @@ tags: [${n % 2 === 0 ? '"blog","seed"' : '"photography"'}]
   });
 
   await prisma.post.createMany({ data });
-  console.log("✅ Seed inserted:", data.length, "posts");
+  log.info("Seed inserted", { count: data.length });
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed error:", e);
+    log.error("Seed script failed", { err: serializeError(e) });
     process.exit(1);
   })
   .finally(async () => {

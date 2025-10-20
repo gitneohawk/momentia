@@ -5,6 +5,9 @@ import {
   generateBlobSASQueryParameters,
 } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
+import { logger, serializeError } from "./logger";
+
+const log = logger.child({ module: "azure-storage" });
 
 // シングルトンインスタンスを保持する変数
 let _client: BlobServiceClient | null = null;
@@ -22,14 +25,14 @@ export function getBlobServiceClient(): BlobServiceClient {
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
 
   if (useMsi && accountName) {
-    console.log("[Azure Storage] Initializing with Managed Identity (MSI).");
+    log.info("Azure Storage initialised with Managed Identity", { auth: "msi" });
     const endpoint = `https://${accountName}.blob.core.windows.net`;
     _client = new BlobServiceClient(endpoint, new DefaultAzureCredential());
     return _client;
   }
 
   if (connectionString) {
-    console.log("[Azure Storage] Initializing with Connection String.");
+    log.info("Azure Storage initialised with connection string", { auth: "connection-string" });
     _client = BlobServiceClient.fromConnectionString(connectionString);
     return _client;
   }
@@ -79,7 +82,10 @@ export function createSasGenerator() {
         const url = `${publicEndpoint}/${containerName}/${encodeURI(storagePath)}?${sas}`;
         sasCache.set(key, { url, expiresAt });
         return url;
-      } catch (e) { console.error("[SAS Generator] MSI User Delegation SAS error:", e); return null; }
+      } catch (e) {
+        log.error("MSI user delegation SAS error", { err: serializeError(e) });
+        return null;
+      }
     }
     
     if (connectionString) {
@@ -89,9 +95,12 @@ export function createSasGenerator() {
         const url = `${publicEndpoint.replace(/\/$/, "")}/${containerName}/${encodeURI(storagePath)}?${sas}`;
         sasCache.set(key, { url, expiresAt });
         return url;
-      } catch (e) { console.error("[SAS Generator] Shared Key SAS error:", e); return null; }
+      } catch (e) {
+        log.error("Shared key SAS generation error", { err: serializeError(e) });
+        return null;
+      }
     }
-    console.error("[SAS Generator] No valid authentication method found.");
+    log.warn("No valid authentication method found for SAS generation");
     return null;
   };
 }

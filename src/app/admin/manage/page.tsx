@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
+import { logger, serializeError } from "@/lib/logger";
+const log = logger.child({ module: "app/admin/manage" });
 
 type Item = {
   slug: string;
@@ -122,7 +124,7 @@ export default function AdminManagePage() {
       if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
       setPhotographers(Array.isArray(json?.items) ? (json.items as Photographer[]) : []);
     } catch (err) {
-      console.error("[admin/manage] load photographers failed:", err);
+      log.error("Admin manage load photographers failed", { err: serializeError(err) });
     }
   }, []);
 

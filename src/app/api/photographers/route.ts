@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/photographers" });
 
 export async function GET() {
   try {
@@ -30,7 +33,7 @@ export async function GET() {
       }
     );
   } catch (error: any) {
-    console.error("[/api/photographers] failed", error);
+    log.error("Photographers API failed", { err: serializeError(error) });
     return NextResponse.json(
       { error: String(error?.message || error) },
       { status: 500, headers: { "Cache-Control": "no-store" } }

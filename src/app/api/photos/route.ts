@@ -9,6 +9,7 @@ import {
 } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 function mask(s?: string | null, showPrefix = 3) {
   if (!s) return "(none)";
@@ -18,6 +19,9 @@ function mask(s?: string | null, showPrefix = 3) {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/photos" });
+const shouldLogDebug = process.env.DEBUG_API_PHOTOS === "1" || process.env.NODE_ENV !== "production";
 
 const photosLimiter = createRateLimiter({ prefix: "photos:list", limit: 120, windowMs: 60_000 });
 const ALLOWED_HOSTS = new Set([
@@ -101,13 +105,6 @@ function getPublicBase(endpoint: string) {
   return endpoint.replace(/\/+$/, "");
 }
 
-// info log helper: mute in production unless explicitly enabled
-const logInfo = (...args: any[]) => {
-  if (process.env.DEBUG_API_PHOTOS === "1" || process.env.NODE_ENV !== "production") {
-    (console.info as any)(...args);
-  }
-};
-
 export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const bad = checkHostOrigin(req);
@@ -138,13 +135,19 @@ export async function GET(req: Request) {
   // 最初の呼び出しでだけ環境の有無を軽くログ
   if ((globalThis as any).__photosBootLogged__ !== true) {
     (globalThis as any).__photosBootLogged__ = true;
-    try {
-      logInfo("[/api/photos] boot env check(rt)", {
-        hasConn: Boolean(CONN), hasAcc: Boolean(ACC), acc: mask(ACC),
-        hasKey: Boolean(KEY), keyLen: KEY?.length ?? 0, nodeEnv: process.env.NODE_ENV,
-      });
-    } catch (e) {
-      console.error("[/api/photos] env check logging failed", e);
+    if (shouldLogDebug) {
+      try {
+        log.info("Photos API boot env check", {
+          hasConn: Boolean(CONN),
+          hasAcc: Boolean(ACC),
+          acc: mask(ACC),
+          hasKey: Boolean(KEY),
+          keyLen: KEY?.length ?? 0,
+          nodeEnv: process.env.NODE_ENV,
+        });
+      } catch (e) {
+        log.error("Photos API env check logging failed", { err: serializeError(e) });
+      }
     }
   }
 
@@ -209,7 +212,7 @@ export async function GET(req: Request) {
         sasCache.set(key, { url, expiresAt });
         return url;
       } catch (e) {
-        console.error("[/api/photos] user-delegation-sas error", e);
+        log.error("Photos API user delegation SAS error", { err: serializeError(e) });
         // フォールバックに続く
       }
     }
@@ -236,12 +239,14 @@ export async function GET(req: Request) {
       sasCache.set(key, { url, expiresAt });
       return url;
     } catch (e) {
-      console.error("[/api/photos] shared-key-sas error", e);
+      log.error("Photos API shared key SAS error", { err: serializeError(e) });
       return null;
     }
   };
 
-  logInfo("[/api/photos] request", { q, kw, limit, photographer: photographerSlug });
+  if (shouldLogDebug) {
+    log.info("Photos API request", { q, kw, limit, photographer: photographerSlug });
+  }
 
   let photos: PhotoWithRels[] = [];
   try {
@@ -266,7 +271,7 @@ export async function GET(req: Request) {
       take: limit,
     });
   } catch (err) {
-    console.error("Error occurred:", err);
+    log.error("Photos API fetch failed", { err: serializeError(err) });
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 

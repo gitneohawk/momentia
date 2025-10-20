@@ -1,10 +1,12 @@
 // src/app/purchase/[slug]/page.tsx
 "use client";
 import React, { useEffect, useState } from "react";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs"; // 画像URL直叩きなどサーバフェッチ想定（ページ自体はCSR）
 export const dynamic = "force-dynamic";
 
+const log = logger.child({ module: "app/purchase" });
 type Item = {
   slug: string;
   width: number;
@@ -63,7 +65,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
         const json: Item = await res.json();
         if (!aborted) setItem(json ?? null);
       } catch (e: any) {
-        console.error("[purchase] client fetch failed", e);
+        log.error("Purchase client fetch failed", { err: serializeError(e) });
         if (!aborted) setError(e?.message ?? "fetch failed");
       } finally {
         if (!aborted) setLoading(false);
@@ -284,7 +286,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
         const { url } = await res.json();
         if (url) window.location.href = url;
       } catch (e) {
-        console.error("Checkout error", e);
+        log.error("Checkout initiation failed", { err: serializeError(e) });
         alert("購入手続きに失敗しました。");
       }
     }}

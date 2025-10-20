@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -45,6 +46,7 @@ function validateSessionId(id?: string): boolean {
 }
 
 const prisma = new PrismaClient();
+const log = logger.child({ module: "api/admin/orders/status" });
 
 export async function PUT(
   req: Request,
@@ -101,7 +103,7 @@ export async function PUT(
     }
     return NextResponse.json(updated);
   } catch (err) {
-    console.error("Error occurred:", err);
+    log.error("Admin order status update failed", { sessionId: p.sessionId, err: serializeError(err) });
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }

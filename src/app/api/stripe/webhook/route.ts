@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { PrismaClient } from "@prisma/client";
 import { sendMail } from "@/lib/mailer";
 import { tplOrderDigitalUser, tplOrderPanelUser, tplOrderAdminNotice } from "@/lib/mail-templates";
+import { logger, serializeError } from "@/lib/logger";
 
 // --- security helpers / webhook hardening ---
 const MAX_BODY_BYTES_WEBHOOK = 256 * 1024; // 256KB safety cap
@@ -39,6 +40,8 @@ function alreadyProcessed(eventId: string): boolean {
 const prisma = new PrismaClient();
 export const runtime = "nodejs"; // Edge不可: 署名検証に生ボディが必要
 
+const log = logger.child({ module: "api/stripe-webhook" });
+
 export async function POST(req: Request) {
   // Basic header validations before reading body
   const cl = req.headers.get('content-length');
@@ -66,24 +69,24 @@ export async function POST(req: Request) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret, 300); // 5 min tolerance
   } catch (err: any) {
-    console.error("[ALERT][STRIPE_WEBHOOK_ERROR][CONSTRUCT_EVENT]", {
-      message: String(err),
+    log.error("Stripe webhook signature verification failed", {
+      err: serializeError(err),
     });
     // 署名不一致など
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
-  console.info("[STRIPE_WEBHOOK_RECEIVED]", { eventId: event.id, type: event.type });
+  log.info("Stripe webhook received", { eventId: event.id, type: event.type });
 
   // Drop duplicates (Stripe retries) quickly in-process; DB upsert is a second layer
   if (alreadyProcessed(event.id)) {
-    console.info('[STRIPE_WEBHOOK_DUPLICATE_IGNORED]', { eventId: event.id, type: event.type });
+    log.info("Stripe webhook duplicate ignored", { eventId: event.id, type: event.type });
     return NextResponse.json({ received: true, duplicate: true });
   }
 
   // Allowlist events
   if (event.type !== 'checkout.session.completed') {
-    console.info('[STRIPE_WEBHOOK_IGNORED]', { eventId: event.id, type: event.type });
+    log.info("Stripe webhook ignored event type", { eventId: event.id, type: event.type });
     return NextResponse.json({ received: true });
   }
 
@@ -106,16 +109,17 @@ export async function POST(req: Request) {
     const name = meta.name ?? null;
     const slug = meta.slug ?? null;
 
+    const maskedEmail = maskEmail(email);
     const logBase = {
       eventId: event.id,
       type: event.type,
       orderId,
-      email,
+      customerEmail: maskedEmail,
       itemType,
       slug,
     };
 
-    console.info("[STRIPE_WEBHOOK_PROCESSING]", logBase);
+    log.info("Stripe webhook processing", logBase);
 
     // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
     const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
@@ -157,14 +161,14 @@ export async function POST(req: Request) {
         select: { id: true },
       });
 
-      console.info("[STRIPE_WEBHOOK_OK][DB_SAVED]", {
+      log.info("Stripe webhook order persisted", {
         ...logBase,
         dbId: orderRecord.id,
       });
     } catch (dbErr) {
-      console.error("[ALERT][STRIPE_WEBHOOK_ERROR][DB_SAVE_FAILED]", {
+      log.error("Stripe webhook order persistence failed", {
         ...logBase,
-        error: String(dbErr),
+        err: serializeError(dbErr),
       });
       return new NextResponse("DB Error", { status: 500 });
     }
@@ -221,9 +225,9 @@ export async function POST(req: Request) {
         }
       }
     } catch (tokErr) {
-      console.error("[ALERT][STRIPE_WEBHOOK_ERROR][TOKEN_CREATE_FAILED]", {
-        orderId: full.id,
-        error: String(tokErr),
+      log.error("Stripe webhook token issuance failed", {
+        ...logBase,
+        err: serializeError(tokErr),
       });
       // トークン発行失敗でも、後続（管理通知など）は進める
     }
@@ -236,7 +240,7 @@ export async function POST(req: Request) {
     try {
       const h = new URL(baseUrl).host.toLowerCase();
       if (!ALLOWED_HOSTS_WEB.has(h)) {
-        console.warn('[STRIPE_WEBHOOK_WARN][BASEURL_MISMATCH]', { ...logBase, host: h });
+        log.warn("Stripe webhook base URL mismatch", { ...logBase, host: h });
         // proceed without URLs to avoid leaking wrong host
       }
     } catch {
@@ -277,16 +281,16 @@ export async function POST(req: Request) {
           html: finalHtmlUser,
           text: finalTextUser,
         });
-        console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
+        log.info("Stripe webhook user mail sent", {
           ...logBase,
           to: maskEmail(email),
-          accessTokenId,
+          hasAccessToken: Boolean(accessTokenId),
         });
 
         if (_invoiceUrl) {
-          console.info("[STRIPE_WEBHOOK_INFO][INVOICE_URL_ATTACHED]", {
+          log.info("Stripe webhook invoice link attached", {
             ...logBase,
-            invoiceUrl: _invoiceUrl,
+            invoiceLink: true,
           });
         }
 
@@ -312,10 +316,10 @@ export async function POST(req: Request) {
             html: adminHtml,
             text: adminText,
           });
-          console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
+          log.info("Stripe webhook admin mail sent", {
             ...logBase,
             to: maskEmail(adminTo),
-            invoiceUrl: _invoiceUrl,
+            invoiceLink: Boolean(_invoiceUrl),
           });
         }
       } else if (itemType === "panel" && email) {
@@ -343,15 +347,15 @@ export async function POST(req: Request) {
           html: finalHtmlUser,
           text: finalTextUser,
         });
-        console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_USER]", {
+        log.info("Stripe webhook user mail sent", {
           ...logBase,
           to: maskEmail(email),
         });
 
         if (_invoiceUrl) {
-          console.info("[STRIPE_WEBHOOK_INFO][INVOICE_URL_ATTACHED]", {
+          log.info("Stripe webhook invoice link attached", {
             ...logBase,
-            invoiceUrl: _invoiceUrl,
+            invoiceLink: true,
           });
         }
 
@@ -377,18 +381,18 @@ export async function POST(req: Request) {
             html: adminHtml,
             text: adminText,
           });
-          console.info("[STRIPE_WEBHOOK_OK][MAIL_SENT_ADMIN]", {
+          log.info("Stripe webhook admin mail sent", {
             ...logBase,
             to: maskEmail(adminTo),
-            invoiceUrl: _invoiceUrl,
+            invoiceLink: Boolean(_invoiceUrl),
           });
         }
       }
     } catch (mailErr) {
       // メール失敗はログのみ（Webhookは 200 を返す）
-      console.error("[ALERT][STRIPE_WEBHOOK_ERROR][MAIL_FAILED]", {
+      log.error("Stripe webhook mail delivery failed", {
         ...logBase,
-        error: String(mailErr),
+        err: serializeError(mailErr),
       });
     }
   }

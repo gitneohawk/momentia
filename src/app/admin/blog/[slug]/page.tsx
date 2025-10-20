@@ -4,7 +4,9 @@ import { useParams, useRouter } from "next/navigation";
 import { blogMdxTemplate } from "@/lib/mdxTemplates";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { logger, serializeError } from "@/lib/logger";
 const BlogImageUploader = dynamic(() => import("@/components/BlogImageUploader"), { ssr: false });
+const log = logger.child({ module: "app/admin/blog/edit" });
 
 type Form = {
   slug: string; title: string; description: string;
@@ -45,7 +47,7 @@ export default function AdminBlogEdit() {
           date: p.publishedAt ? new Date(p.publishedAt).toISOString().slice(0,16) : "",
         });
       } catch (e) {
-        console.error(e);
+        log.error("Admin blog load failed", { err: serializeError(e) });
         setMsg("通信エラーが発生しました");
       } finally {
         setLoading(false);

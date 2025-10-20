@@ -4,10 +4,13 @@ import { getServerSession } from "next-auth";
 import { PrismaClient } from "@prisma/client";
 import { isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 const prisma = new PrismaClient();
 
 export const runtime = "nodejs"; // 明示しておくと安心
+
+const log = logger.child({ module: "api/admin/orders" });
 
 const ALLOWED_HOSTS = new Set([
   "www.momentia.photo",
@@ -61,7 +64,7 @@ export async function GET(req: Request) {
     });
     return NextResponse.json({ items });
   } catch (e) {
-    console.error("[admin/orders] GET error", e);
+    log.error("Admin orders fetch failed", { err: serializeError(e) });
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }

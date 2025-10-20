@@ -8,6 +8,7 @@ import * as exifr from "exifr";
 import { generateWatermark } from "@/lib/watermark";
 import { getToken } from "next-auth/jwt";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";       // sharp を使うため Node 実行
 export const dynamic = "force-dynamic"; // 開発中はキャッシュ無効でOK
@@ -37,9 +38,7 @@ const PUB_PREFIX = "public/";
 const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT || "momentiastorage";
 
 // --- helpers (env / logging) ---
-const isProd = process.env.NODE_ENV === "production";
-const info = (...args: any[]) => { if (!isProd) console.info(...args); };
-const warn = (...args: any[]) => console.warn(...args);
+const log = logger.child({ module: "api/upload" });
 
 function parseConnString(raw: string) {
   const s = raw.trim().replace(/^\s*['"]|['"]\s*$/g, ""); // strip quotes/whitespace
@@ -101,17 +100,15 @@ function getBlobService() {
   // Prefer MSI when explicitly enabled
   if (process.env.AZURE_USE_MSI === "1") {
     const endpoint = `https://${ACCOUNT_NAME}.blob.core.windows.net`;
-    console.log("[storage] mode=msi endpoint=", endpoint);
+    log.info("Blob Storage client initialised with MSI", { endpoint });
     return makeBlobServiceWithMsi();
   }
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
   if (!conn) {
     throw new Error("missing storage connection");
   }
-  console.log(
-    "[storage]",
-    conn.includes("devstoreaccount1") ? "azurite" : conn.split(";").slice(0, 2).join(";")
-  );
+  const mode = conn.includes("devstoreaccount1") ? "azurite" : "azure";
+  log.info("Blob Storage client initialised with connection string", { mode });
   return makeBlobService(conn);
 }
 
@@ -197,7 +194,7 @@ export async function POST(req: Request) {
     try {
       container = await ensureContainer();
     } catch (err: any) {
-      console.error("[storage] init error:", err?.message || err);
+      log.error("Storage initialisation failed", { err: serializeError(err) });
       return NextResponse.json({ error: "storage init failed" }, { status: 500 });
     }
 
@@ -281,13 +278,13 @@ export async function POST(req: Request) {
     // Optional: kick off WM generation asynchronously (non-blocking, no self-fetch)
     if (wantWm) {
       void generateWatermark({ slug, width: 2048 }).then(
-        () => info("[upload] wm generate triggered", { slug }),
-        (e) => warn("[upload] wm generate failed", { slug, err: e?.message || String(e) })
+        () => log.info("Watermark generation enqueued", { slug }),
+        (e) => log.warn("Watermark generation failed", { slug, err: serializeError(e) })
       );
     }
     return NextResponse.json({ ok: true, slug });
   } catch (e: any) {
-    console.error(e);
+    log.error("Upload handler crashed", { err: serializeError(e) });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }

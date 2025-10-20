@@ -2,9 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { createSasGenerator } from "@/lib/azure-storage";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/photo" });
 
 // --- ヘルパー関数 ---
 const photoBySlugLimiter = createRateLimiter({ prefix: "photo:slug", limit: 120, windowMs: 60_000 });
@@ -99,7 +102,7 @@ export async function GET(
     });
 
   } catch (e: any) {
-    console.error("[/api/photo/slug] Critical error:", e);
+    log.error("Photo detail handler failed", { err: serializeError(e) });
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500, headers: { "Cache-control": "no-store" } });
   }
 }

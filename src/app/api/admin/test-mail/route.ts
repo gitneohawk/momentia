@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth/next";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 // Feature flag: allow this endpoint only when explicitly enabled.
 // In production, it returns 404 unless ENABLE_TEST_ROUTES=true is set on the server.
@@ -9,6 +10,15 @@ const ENABLE_TEST_ROUTES = process.env.ENABLE_TEST_ROUTES === "true";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/admin/test-mail" });
+
+const maskEmail = (value: string | null | undefined) => {
+  if (!value) return value ?? "";
+  const [user, domain] = value.split("@");
+  if (!user || !domain) return value;
+  return `${user.slice(0, 1)}***@${domain}`;
+};
 
 const ALLOWED_HOSTS = new Set([
   "www.momentia.photo",
@@ -66,7 +76,11 @@ export async function GET(req: NextRequest) {
   // In normal (flag off) mode, always send to the logged-in admin to avoid abuse.
   const to = ENABLE_TEST_ROUTES ? (requestedTo || session.user.email!) : session.user.email!;
   try {
-    console.info(JSON.stringify({ level: "info", type: "mail.test", env: process.env.NODE_ENV, to, subject, by: session.user.email }));
+    log.info("Test mail triggered", {
+      to: maskEmail(to),
+      subject,
+      by: maskEmail(session.user.email ?? ""),
+    });
     const { sendMail } = await import("@/lib/mailer");
     await sendMail({
       to,
@@ -75,6 +89,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ success: true, to, subject });
   } catch (err: any) {
+    log.error("Test mail failed", { err: serializeError(err) });
     return NextResponse.json(
       { success: false, error: String(err?.message ?? err) },
       { status: 503 }

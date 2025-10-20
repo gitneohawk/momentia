@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions, isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,8 @@ async function assertAdmin() {
   return isAdminEmail(email);
 }
 
+const log = logger.child({ module: "api/admin/blog" });
+
 // GET /api/admin/blog  -> list posts (optionally filter)
 export async function GET(req: Request) {
   if (!(await assertAdmin())) {
@@ -91,7 +94,7 @@ export async function GET(req: Request) {
     });
     return NextResponse.json({ posts, items: posts, total: posts.length });
   } catch (e) {
-    console.error("Error occurred:", e);
+    log.error("Admin blog list failed", { err: serializeError(e) });
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -169,7 +172,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ ok: true, post });
   } catch (e) {
-    console.error("Error occurred:", e);
+    log.error("Admin blog save failed", { err: serializeError(e) });
     const errorMessage =
       e && typeof e === "object" && "message" in e && typeof (e as any).message === "string"
         ? (e as any).message

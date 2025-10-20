@@ -10,6 +10,8 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
+import { logger, serializeError } from "@/lib/logger";
+const log = logger.child({ module: "app/gallery" });
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +88,7 @@ function GalleryPageInner() {
         if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
         setPhotographers(Array.isArray(json.items) ? (json.items as Photographer[]) : []);
       } catch (e) {
-        console.error("[gallery] failed to load photographers", e);
+        log.error("Gallery photographers load failed", { err: serializeError(e) });
       }
     })();
   }, []);
@@ -341,7 +343,10 @@ function GalleryPageInner() {
                         try {
                           router.push(`/purchase/${active.slug}`);
                         } catch (e) {
-                          console.error("[gallery] navigate to purchase failed:", e);
+                          log.error("Gallery navigation to purchase failed", {
+                            slug: item.slug,
+                            err: serializeError(e),
+                          });
                         }
                       }}
                       className="inline-flex items-center gap-2 rounded-lg bg-white text-black px-4 py-1.5 text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.99] transition-all"

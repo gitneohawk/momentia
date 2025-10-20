@@ -22,6 +22,9 @@ import {
 } from "@azure/storage-blob";
 
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
+
+const log = logger.child({ module: "api/download" });
 const downloadLimiter = createRateLimiter({ prefix: "download", limit: 60, windowMs: 60_000 });
 
 /**
@@ -156,7 +159,7 @@ export async function GET(req: NextRequest) {
   const downloadName = `${safeSlug}${safeSuffix}.jpg`;
 
   // Debug logging (redacted)
-  console.log("[download] env", {
+  log.debug("Download environment", {
     hasAcc: !!accountName,
     hasKey: !!accountKey,
     hasConn: !!process.env.AZURE_STORAGE_CONNECTION_STRING,
@@ -168,7 +171,10 @@ export async function GET(req: NextRequest) {
   });
 
   if (!accountName || !accountKey) {
-    console.error("[download] storage credentials missing");
+    log.error("Storage credentials missing", {
+      hasAcc: !!accountName,
+      hasKey: !!accountKey,
+    });
     return NextResponse.json({ error: "ストレージの資格情報が未設定です。" }, { status: 500 });
   }
 
@@ -206,7 +212,10 @@ export async function GET(req: NextRequest) {
         });
       } catch (e) {
         // カウント失敗はダウンロード自体を妨げない（ログのみ）
-        console.error("[download] failed to increment usedCount", e);
+        log.warn("Failed to increment token usage count", {
+          tokenId: resolved.accessTokenId,
+          err: serializeError(e),
+        });
       }
     }
 
@@ -215,7 +224,7 @@ export async function GET(req: NextRequest) {
     res.headers.set('Pragma', 'no-cache');
     return res;
   } catch (e) {
-    console.error("[download] failed to generate SAS", e);
+    log.error("Failed to generate download SAS", { err: serializeError(e) });
     return NextResponse.json(
       { error: "ダウンロードURLの生成に失敗しました。" },
       { status: 500 },

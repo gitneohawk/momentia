@@ -5,9 +5,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/admin/photo" });
 
 const MAX_JSON_BYTES = 64 * 1024; // 64KB
 const ALLOWED_HOSTS = new Set([
@@ -249,7 +252,11 @@ export async function DELETE(
     if (!validateSlug(slug)) return NextResponse.json({ error: "invalid slug" }, { status: 400 });
     // Structured diagnostics helper
     const logErr = (label: string, err: unknown) => {
-      console.error(`[photo:DELETE] ${label} slug=${slug}`, err);
+      log.error("Admin photo delete step failed", {
+        label,
+        slug,
+        err: serializeError(err),
+      });
     };
 
     // 1) DBから対象取得
@@ -285,7 +292,10 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true, warnings: (typeof blobErrors !== "undefined" && blobErrors.length) ? { blobErrors } : undefined });
   } catch (e: any) {
-    console.error(`[photo:DELETE] unhandled slug=${(await params as any)?.slug ?? "unknown"}`, e);
+    log.error("Admin photo delete handler failed", {
+      slug: (await params as any)?.slug ?? "unknown",
+      err: serializeError(e),
+    });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }

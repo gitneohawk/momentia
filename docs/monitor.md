@@ -5,7 +5,7 @@ Momentia 監視＆ログ運用ガイド
 1) ログの基本方針
 
 1.1 出力先
-	•	アプリログ: console.info / warn / error → Azure Container Apps → Log Analytics (LA)
+	•	アプリログ: `logger.info` / `logger.warn` / `logger.error` → Azure Container Apps → Log Analytics (LA)
 	•	カテゴリ: 環境（Managed Environment）の ContainerAppConsoleLogs、ContainerAppSystemLogs を有効化済み
 	•	プラットフォームメトリクス: ACA/環境の AllMetrics → LA
 
@@ -28,8 +28,8 @@ Momentia 監視＆ログ運用ガイド
 
 {"ts":"2025-10-06T06:59:23Z","level":"error","type":"stripe.webhook","tag":"[ALERT][STRIPE_WEBHOOK_ERROR][CONSTRUCT_EVENT]","error":"Webhook signature verification failed"}
 
-実装メモ: 既存の route.ts ではすでに
-[STRIPE_WEBHOOK_RECEIVED] / [STRIPE_WEBHOOK_PROCESSING] / [STRIPE_WEBHOOK_OK] / [ALERT]... のタグを出力済みです。可能であれば console.*(JSON.stringify(obj)) を徹底するとクエリが容易になります。
+実装メモ: 既存の route.ts では `logger.child()` を使った構造化ログで
+[STRIPE_WEBHOOK_RECEIVED] / [STRIPE_WEBHOOK_PROCESSING] / [STRIPE_WEBHOOK_OK] / [ALERT]... を出力済み。共通ロガーを経由すると JSON 形式が保証され、KQL クエリが容易になります。
 
 ⸻
 

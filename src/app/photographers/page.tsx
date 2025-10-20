@@ -1,6 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
+import { logger, serializeError } from "@/lib/logger";
+
+const log = logger.child({ module: "app/photographers" });
 
 type Photographer = {
   id: string;
@@ -29,7 +32,7 @@ async function getPhotographers(): Promise<Photographer[]> {
       },
     });
   } catch (error) {
-    console.error("[photographers] prisma fetch failed:", error);
+    log.error("Photographers fetch failed", { err: serializeError(error) });
     return [];
   }
 }

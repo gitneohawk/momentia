@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getBlobServiceClient } from "@/lib/azure-storage";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/blog/image" });
 
 // --- ヘルパー関数 ---
 const blogImageLimiter = createRateLimiter({ prefix: "blog:image", limit: 120, windowMs: 60_000 });
@@ -86,7 +89,7 @@ export async function GET(req: NextRequest, context: any) {
     });
 
   } catch (e: any) {
-    console.error("[/api/blog/image] Critical error:", e);
+    log.error("Blog image handler failed", { err: serializeError(e) });
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -3,9 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions, isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/admin/photographers" });
 
 const ALLOWED_HOSTS = new Set([
   "www.momentia.photo",
@@ -78,7 +81,7 @@ export async function GET(req: Request) {
       { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error("[/api/admin/photographers] list failed", error);
+    log.error("Admin photographers list failed", { err: serializeError(error) });
     return NextResponse.json(
       { error: String(error?.message || error) },
       { status: 500, headers: { "Cache-Control": "no-store" } }

@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { logger, serializeError } from "@/lib/logger";
+const log = logger.child({ module: "app/admin/blog/list" });
 
 type Item = {
   id: string; slug: string; title: string;
@@ -21,7 +23,7 @@ useEffect(() => {
       const json = await res.json();
       setItems(json.items ?? []);
     } catch (e) {
-      console.error(e);
+      log.error("Admin blog list fetch failed", { err: serializeError(e) });
       setItems([]);
     } finally {
       setLoading(false);

@@ -5,9 +5,12 @@ import { prisma } from "@/lib/prisma";
 import sharp from "sharp";
 import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/admin/blog/upload" });
 
 // --- security constants / helpers ---
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB cap for hero images
@@ -134,7 +137,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, path: key });
   } catch (e: any) {
-    console.error(e);
+    log.error("Admin blog upload failed", { err: serializeError(e) });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }

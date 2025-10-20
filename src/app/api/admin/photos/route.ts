@@ -12,9 +12,12 @@ import {
 } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { logger, serializeError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const log = logger.child({ module: "api/admin/photos" });
 
 const ALLOWED_HOSTS = new Set([
   "www.momentia.photo",
@@ -116,7 +119,7 @@ async function getSignedUrl(storagePath: string, ttlMinutes = 60): Promise<strin
       const publicBase = getPublicBase(endpoint);
       return `${publicBase}/${CONTAINER}/${encodeURI(storagePath)}?${sas}`;
     } catch (e) {
-      console.error("[/api/admin/photos] MSI SAS error:", e);
+      log.error("Admin photos MSI SAS error", { err: serializeError(e) });
       // フォールバックへ
     }
   }
@@ -200,7 +203,7 @@ export async function GET(req: Request) {
       status: 200,
     });
   } catch (_err: any) {
-    console.error("/api/admin/photos GET error:", _err);
+    log.error("Admin photos list failed", { err: serializeError(_err) });
     return new NextResponse(JSON.stringify({ error: String(_err?.message || _err) }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
