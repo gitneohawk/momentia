@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 const isAzurite =
   process.env.AZURE_STORAGE_CONNECTION_STRING?.includes("devstoreaccount1") ?? false;
 
+const baseSecurityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
@@ -20,6 +27,21 @@ const nextConfig: NextConfig = {
   },
   // サーバで必要なネイティブパッケージ
   serverExternalPackages: ["@azure/identity", "@azure/storage-blob", "@prisma/client", "prisma"],
+  async headers() {
+    const securityHeaders = [
+      ...baseSecurityHeaders,
+      ...(process.env.NODE_ENV === "production"
+        ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+        : []),
+    ];
+
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -44,10 +44,14 @@ export function middleware(req: NextRequest) {
     font-src 'self' https://fonts.gstatic.com data:;
     media-src 'self' https:${azuriteOrigins};
     frame-src 'self' https:;
-  `.replace(/\n/g, " ").trim();
+    frame-ancestors 'none';
+  `
+    .replace(/\n/g, " ")
+    .trim();
 
   const res = NextResponse.next();
   res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("X-Frame-Options", "DENY");
   return res;
 }
 
