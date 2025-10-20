@@ -65,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/legal/license" className="hover:underline">ライセンス</Link>
             <Link href="/legal/terms" className="hover:underline">利用規約</Link>
             <Link href="/legal/privacy" className="hover:underline">プライバシー</Link>
+            <Link href="/legal/tokusho" className="hover:underline">特定商取引法に基づく表記</Link>
             <Link href="/contact" className="hover:underline">お問い合わせ</Link>
           </div>
           <p>

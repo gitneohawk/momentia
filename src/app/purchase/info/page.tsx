@@ -14,9 +14,9 @@ export default function PurchaseInfo() {
 
       <h2 className="text-xl font-semibold mb-2">デジタルダウンロード</h2>
       <div className="mb-6 text-gray-700 space-y-1">
-        <p>長辺2400pxの高品質JPEGデータをご提供します。</p>
+        <p>4K相当（約3840px）の高解像度 JPEG データをご提供します。</p>
         <p>ご購入後すぐにダウンロードリンクが発行され、即時ご利用いただけます。</p>
-        <p>透かしは入っていません。個人利用の範囲でご利用いただけます（商用利用は別途ライセンスが必要です）。</p>
+        <p>透かしは入っていません。規約を順守のうえ商用利用が可能ですが、再配布・再販売・第三者への譲渡、二次販売目的のグッズ化などは禁止されています。</p>
       </div>
 
       <h2 className="text-xl font-semibold mb-2">その他</h2>

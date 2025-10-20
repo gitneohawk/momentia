@@ -177,8 +177,8 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
 
           <div className="grid gap-1 text-sm">
             <div className="text-neutral-700">形式: JPEG（sRGB）</div>
-            <div className="text-neutral-700">デジタル: 長辺2400px（個人利用・商用利用可）</div>
-            <div className="text-neutral-700">想定用途: 個人利用（壁紙・個人プリント等）</div>
+            <div className="text-neutral-700">デジタル: 4K相当（約3840px、規約順守のうえ商用利用可）</div>
+            <div className="text-neutral-700">想定用途: 個人利用（壁紙等）</div>
             <div className="text-neutral-700">A2パネル: プロラボで高品質プリントし白枠パネル仕上げ</div>
           </div>
 
@@ -209,7 +209,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
                   }`}
                 >
                   <div className="font-medium">デジタル（商用可）</div>
-                  <div className="text-sm text-neutral-600">JPEG / 個人・商用利用可（規約順守）</div>
+                  <div className="text-sm text-neutral-600">JPEG / 商用利用可（規約順守）</div>
                   <div className="mt-1 text-lg font-semibold">
                     ¥{priceDigital.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（税込）</span>
                   </div>
@@ -303,8 +303,8 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
 
           {variant === "digital" && (
             <div className="text-xs text-neutral-500 leading-relaxed">
-              購入者（個人・法人）は自らの活動や業務において、本画像を商用利用を含めてご利用いただけます。
-              再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は禁止されます。
+              購入者（個人・法人）は、自らの活動や業務において本画像を商用利用を含めてご利用いただけます。
+              ただし、再配布・再販売・第三者への譲渡、商品化（二次販売目的のグッズ等への使用）は禁止されています。
               高解像度ファイルには透かしは入りません。詳細は利用規約をご確認ください。
             </div>
           )}
