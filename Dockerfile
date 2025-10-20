@@ -5,6 +5,7 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package*.json ./
+COPY .npmrc .npmrc
 RUN npm ci --ignore-scripts
 
 # ---------- builder ----------
