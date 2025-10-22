@@ -20,6 +20,7 @@ type Item = {
     displayName?: string | null;
   } | null;
   urls: { thumbWebp?: string | null; thumb: string | null; large: string | null; watermarked?: string | null };
+  metrics?: { totalSalesJpy: number; salesCount: number } | null;
 };
 
 export const revalidate = 60;

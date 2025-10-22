@@ -125,6 +125,10 @@ export async function GET(req: Request) {
   const rawPhotographer = (searchParams.get("photographer")?.trim() || "").toLowerCase();
   const photographerSlug =
     rawPhotographer && /^[a-z0-9-]{1,120}$/.test(rawPhotographer) ? rawPhotographer : null;
+  const wantFeatured = (() => {
+    const ft = (searchParams.get("featured") || "").toLowerCase();
+    return ft === "1" || ft === "true";
+  })();
 
   const CONN = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
   const ACC = /AccountName=([^;]+)/i.exec(CONN)?.[1] ?? null;
@@ -248,28 +252,94 @@ export async function GET(req: Request) {
     log.info("Photos API request", { q, kw, limit, photographer: photographerSlug });
   }
 
+  const baseWhere: Prisma.PhotoWhereInput = {
+    AND: [
+      { published: true },
+      q
+        ? {
+            OR: [
+              { caption: { contains: q, mode: "insensitive" } },
+              { slug: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {},
+      kw ? { keywords: { some: { word: { equals: kw, mode: "insensitive" } } } } : {},
+      photographerSlug ? { photographer: { slug: photographerSlug } } : {},
+    ],
+  };
+
   let photos: PhotoWithRels[] = [];
+  const salesMetrics = new Map<string, { totalSalesJpy: number; salesCount: number }>();
+
   try {
-    photos = await prisma.photo.findMany({
-      where: {
-        AND: [
-          { published: true },
-          q
-            ? {
-                OR: [
-                  { caption: { contains: q, mode: "insensitive" } },
-                  { slug: { contains: q, mode: "insensitive" } },
-                ],
-              }
-            : {},
-          kw ? { keywords: { some: { word: { equals: kw, mode: "insensitive" } } } } : {},
-          photographerSlug ? { photographer: { slug: photographerSlug } } : {},
+    if (wantFeatured && !q && !kw) {
+      const salesStatuses = ["paid", "processing", "shipped"] as const;
+      const aggregates = await prisma.order.groupBy({
+        by: ["slug"],
+        where: {
+          slug: { not: null },
+          status: { in: salesStatuses },
+        },
+        _sum: { amountJpy: true },
+        _count: { slug: true },
+        orderBy: [
+          { _sum: { amountJpy: "desc" } },
+          { _count: { slug: "desc" } },
         ],
-      },
-      orderBy: { createdAt: "desc" },
-      include: { variants: true, keywords: true, photographer: true },
-      take: limit,
-    });
+        take: Math.max(limit * 2, 6),
+      });
+
+      const rankedSlugs: string[] = [];
+      for (const entry of aggregates) {
+        if (!entry.slug) continue;
+        if (!entry._sum?.amountJpy && !entry._count?.slug) continue;
+        if (!rankedSlugs.includes(entry.slug)) {
+          rankedSlugs.push(entry.slug);
+          salesMetrics.set(entry.slug, {
+            totalSalesJpy: entry._sum?.amountJpy ?? 0,
+            salesCount: entry._count?.slug ?? 0,
+          });
+        }
+      }
+
+      if (rankedSlugs.length > 0) {
+        const soldPhotos = await prisma.photo.findMany({
+          where: {
+            ...baseWhere,
+            slug: { in: rankedSlugs },
+          },
+          include: { variants: true, keywords: true, photographer: true },
+        });
+        const map = new Map(soldPhotos.map((p) => [p.slug, p]));
+        for (const slug of rankedSlugs) {
+          const hit = map.get(slug);
+          if (hit) {
+            photos.push(hit);
+            if (photos.length >= limit) break;
+          }
+        }
+      }
+
+      if (photos.length < limit) {
+        const fallback = await prisma.photo.findMany({
+          where: {
+            ...baseWhere,
+            slug: { notIn: photos.map((p) => p.slug) },
+          },
+          orderBy: { createdAt: "desc" },
+          include: { variants: true, keywords: true, photographer: true },
+          take: limit - photos.length,
+        });
+        photos = photos.concat(fallback);
+      }
+    } else {
+      photos = await prisma.photo.findMany({
+        where: baseWhere,
+        orderBy: { createdAt: "desc" },
+        include: { variants: true, keywords: true, photographer: true },
+        take: limit,
+      });
+    }
   } catch (err) {
     log.error("Photos API fetch failed", { err: serializeError(err) });
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
@@ -305,6 +375,7 @@ export async function GET(req: Request) {
         large: large ? await getSignedUrl(large.storagePath, SIGNED_TTL_MIN) : null,
         watermarked: await getSignedUrl(wmName, SIGNED_TTL_MIN, "watermarks"),
       },
+      metrics: salesMetrics.get(p.slug) ?? null,
     };
   }));
 
