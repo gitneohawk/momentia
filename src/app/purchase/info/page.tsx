@@ -4,6 +4,8 @@ export default function PurchaseInfo() {
       <h1 className="text-3xl font-bold mb-4">ご購入について</h1>
       <p className="mb-6 text-gray-700">
         当サイトでは、高品質なプリントのご注文やデジタルダウンロードが可能です。以下のオプションからお選びいただけます。
+        <br className="hidden sm:block" />
+        <span className="text-sm text-gray-500">※ 現在は日本国内のお客さまのみご購入いただけます。</span>
       </p>
       <h2 className="text-xl font-semibold mb-2">高品質プリント（A2パネル）</h2>
       <div className="mb-6 text-gray-700 space-y-1">

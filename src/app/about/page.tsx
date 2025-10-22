@@ -47,6 +47,9 @@ export default function AboutPage() {
           <p className="text-sm leading-relaxed text-neutral-700 sm:text-base">
             デジタルデータのライセンス販売に加え、A2 パネルを中心としたプリント作品をご用意しています。導入のご相談や特別なサイズでの制作など、柔軟に対応いたします。
           </p>
+          <p className="text-xs text-neutral-500 sm:text-sm">
+            ※ 現在は日本国内のお客さまのみご購入いただけます。海外発送は承っておりません。
+          </p>
         </section>
 
         <div className="flex flex-wrap justify-center gap-3">

@@ -187,6 +187,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
             <div className="text-neutral-700">デジタル: 4K相当（約3840px、規約順守のうえ商用利用可）</div>
             <div className="text-neutral-700">想定用途: 個人利用（壁紙等）</div>
             <div className="text-neutral-700">A2パネル: プロラボで高品質プリントし白枠パネル仕上げ</div>
+            <div className="text-xs text-neutral-500">※ 現在は日本国内のお客さまのみご購入いただけます（海外発送は未対応）。</div>
           </div>
 
           {/* バリアント選択 */}
