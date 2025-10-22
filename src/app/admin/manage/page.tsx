@@ -25,7 +25,7 @@ type Item = {
         displayName?: string | null;
       }
     | null;
-  urls: { thumb: string | null; large: string | null; original: string };
+  urls: { thumbWebp?: string | null; thumb: string | null; large: string | null; original: string };
 };
 
 type Photographer = {
@@ -354,7 +354,7 @@ export default function AdminManagePage() {
         {filteredItems.map((it) => (
           <li key={it.slug} className="flex gap-4 border rounded p-3">
             <img
-              src={it.urls.thumb ?? it.urls.large ?? it.urls.original}
+              src={it.urls.thumbWebp ?? it.urls.thumb ?? it.urls.large ?? it.urls.original}
               alt={it.slug}
               className="w-40 h-28 object-cover rounded border"
             />

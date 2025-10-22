@@ -21,10 +21,35 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 const _base = process.env.NEXT_PUBLIC_BASE_URL;
+const siteTitle = "Momentia - 光と時間の呼吸を、そっと壁に。";
+const siteDescription =
+  "Momentiaは、光と時間をテーマにした写真レーベル。静けさを連れてくる作品をお届けします。";
+const ogImage = "/ogp.jpg";
 export const metadata: Metadata = {
   ...(_base ? { metadataBase: new URL(_base) } : {}),
-  title: "Momentia",
-  description: "Momentia — A photo portfolio & sales platform",
+  title: siteTitle,
+  description: siteDescription,
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    siteName: "Momentia",
+    images: [
+      {
+        url: ogImage,
+        width: 1200,
+        height: 630,
+        alt: "Momentia — 光と時間をテーマにした写真レーベル",
+      },
+    ],
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+    images: [ogImage],
+  },
 };
 
 export const viewport: Viewport = {

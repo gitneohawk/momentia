@@ -277,6 +277,7 @@ export async function GET(req: Request) {
 
   const items = await Promise.all(photos.map(async (p) => {
     const thumb = p.variants.find((v: Variant) => v.type === "thumb");
+    const thumbWebp = p.variants.find((v: Variant) => v.type === "thumb-webp");
     const large = p.variants.find((v: Variant) => v.type === "large");
     const wmName = `${p.slug}_wm_2048_v1.jpg`;
     return {
@@ -299,6 +300,7 @@ export async function GET(req: Request) {
           }
         : null,
       urls: {
+        thumbWebp: thumbWebp ? await getSignedUrl(thumbWebp.storagePath, SIGNED_TTL_MIN) : null,
         thumb: thumb ? await getSignedUrl(thumb.storagePath, SIGNED_TTL_MIN) : null,
         large: large ? await getSignedUrl(large.storagePath, SIGNED_TTL_MIN) : null,
         watermarked: await getSignedUrl(wmName, SIGNED_TTL_MIN, "watermarks"),

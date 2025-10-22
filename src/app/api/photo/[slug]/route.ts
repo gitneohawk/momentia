@@ -67,6 +67,7 @@ export async function GET(
 
     const getSignedUrl = createSasGenerator();
     const thumb = photo.variants.find(v => v.type === "thumb");
+    const thumbWebp = photo.variants.find(v => v.type === "thumb-webp");
     const large = photo.variants.find(v => v.type === "large");
 
     const responseData = {
@@ -88,6 +89,7 @@ export async function GET(
           }
         : null,
       urls: {
+        thumbWebp: thumbWebp ? await getSignedUrl(thumbWebp.storagePath, "photos") : null,
         thumb: thumb ? await getSignedUrl(thumb.storagePath, "photos") : null,
         large: large ? await getSignedUrl(large.storagePath, "photos") : null,
         watermarked: `/api/wm/${photo.slug}`,

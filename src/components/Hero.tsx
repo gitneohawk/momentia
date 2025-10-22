@@ -15,7 +15,7 @@ export default function Hero() {
         className="object-cover z-0"
         priority
       />
-      <div className="absolute inset-0 bg-black/30 z-10" />
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-black/15 to-black/30" />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-15 z-20"
@@ -30,7 +30,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="font-serif text-4xl md:text-6xl font-medium tracking-tight text-white drop-shadow-md"
+          className="font-serif text-[clamp(2.5rem,6vw,4.25rem)] font-medium tracking-tight text-white drop-shadow-xl leading-tight"
         >
           Momentia
         </motion.h1>
@@ -38,7 +38,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-          className="mt-4 text-lg md:text-xl text-neutral-200 max-w-2xl mx-auto drop-shadow"
+          className="mt-5 text-base sm:text-lg md:text-xl text-neutral-100 max-w-3xl mx-auto drop-shadow-lg"
         >
           光と時間の呼吸を、そっと壁に。— 静けさを連れてくる写真たち。
         </motion.p>
@@ -50,7 +50,8 @@ export default function Hero() {
         >
           <Link
             href="/gallery"
-            className="inline-flex items-center rounded-lg border border-white/30 bg-white/20 backdrop-blur-sm px-5 py-2.5 text-base font-medium text-white shadow-sm hover:bg-white/30 transition-colors"
+            aria-label="ギャラリーを見る"
+            className="inline-flex items-center rounded-lg border border-white/60 bg-white/20 backdrop-blur-sm px-6 py-2.5 text-base font-medium text-white shadow-lg shadow-black/20 transition-transform duration-300 hover:-translate-y-[2px] hover:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             ギャラリーを見る
           </Link>

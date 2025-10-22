@@ -23,7 +23,7 @@ type Item = {
     name: string;
     displayName?: string | null;
   } | null;
-  urls: { thumb: string | null; large: string | null; watermarked: string | null };
+  urls: { thumbWebp?: string | null; thumb: string | null; large: string | null; watermarked: string | null };
 };
 
 export default function PurchasePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -103,7 +103,12 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   const canDigital = flagsProvided ? !!rawD : true;
   const canPanel = flagsProvided ? !!rawP : true;
   const hasAnyPurchase = canDigital || canPanel;
-  const heroSrc = item?.urls.watermarked ?? item?.urls.large ?? item?.urls.thumb ?? null;
+  const heroSrc =
+    item?.urls.watermarked ??
+    item?.urls.large ??
+    item?.urls.thumbWebp ??
+    item?.urls.thumb ??
+    null;
 
   if (loading || !slug) {
     return (

@@ -19,7 +19,7 @@ type Item = {
     name: string;
     displayName?: string | null;
   } | null;
-  urls: { thumb: string | null; large: string | null; watermarked?: string | null };
+  urls: { thumbWebp?: string | null; thumb: string | null; large: string | null; watermarked?: string | null };
 };
 
 export const revalidate = 60;
@@ -86,8 +86,9 @@ export default async function Home() {
 
           <div className="-m-2 flex flex-wrap">
             {featured.map((p) => {
-                const displaySrc = p.urls.thumb ?? p.urls.large ?? p.urls.watermarked ?? null;
-                if (!displaySrc) return null;
+              const fallbackSrc = p.urls.thumb ?? p.urls.large ?? p.urls.watermarked ?? null;
+              if (!fallbackSrc) return null;
+              const webpSrc = p.urls.thumbWebp ?? null;
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">
                   <Link
@@ -95,13 +96,17 @@ export default async function Home() {
                     prefetch={false}
                     className="group relative block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 hover:shadow-xl transition-shadow duration-300"
                   >
-                        <img
-                      decoding="async"
-                      loading="eager"
-                      src={displaySrc}
-                      alt={p.caption ?? p.slug}
-                      className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
-                    />
+                    <picture>
+                      {webpSrc && <source srcSet={webpSrc} type="image/webp" />}
+                      <img
+                        decoding="async"
+                        loading="lazy"
+                        sizes="(min-width: 768px) 33vw, 100vw"
+                        src={fallbackSrc}
+                        alt={p.caption ?? p.slug}
+                        className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
+                      />
+                    </picture>
                     {/* ホバー時に表示されるグラデーションオーバーレイ */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     

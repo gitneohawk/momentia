@@ -34,7 +34,7 @@ type Item = {
     name: string;
     displayName?: string | null;
   } | null;
-  urls: { thumb: string | null; large: string | null; watermarked?: string | null };
+  urls: { thumbWebp?: string | null; thumb: string | null; large: string | null; watermarked?: string | null };
 };
 
 type Photographer = {
@@ -70,6 +70,15 @@ function GalleryPageInner() {
   const [index, setIndex] = useState<number | -1>(-1);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [supportsWebp] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const canvas = document.createElement("canvas");
+      return Boolean(canvas.getContext && canvas.toDataURL && canvas.toDataURL("image/webp").startsWith("data:image/webp"));
+    } catch {
+      return false;
+    }
+  });
   const vw = useViewportWidth();
   const rowH = vw < 640 ? 150 : vw < 900 ? 170 : vw < 1280 ? 200 : 220;
   const preloaded = useRef<Set<string>>(new Set());
@@ -131,7 +140,10 @@ function GalleryPageInner() {
     setIndex(-1);
   }, [selectedPhotographer]);
 
-  const visibleItems = useMemo(() => items.filter((i) => i.urls.thumb && i.urls.large), [items]);
+  const visibleItems = useMemo(
+    () => items.filter((i) => (i.urls.thumbWebp || i.urls.thumb) && i.urls.large),
+    [items]
+  );
 
   useEffect(() => {
     if (!openSlug || visibleItems.length === 0) return;
@@ -148,7 +160,11 @@ function GalleryPageInner() {
 
     const preloadTargets = visibleItems
       .slice(0, 6)
-      .map((item) => item.urls.thumb ?? item.urls.large)
+      .map((item) =>
+        supportsWebp
+          ? item.urls.thumbWebp ?? item.urls.thumb ?? item.urls.large
+          : item.urls.thumb ?? item.urls.large
+      )
       .filter((src): src is string => typeof src === "string" && src.length > 0);
 
     const created: Array<{ src: string; el: HTMLLinkElement }> = [];
@@ -169,7 +185,7 @@ function GalleryPageInner() {
         cache.delete(src);
       }
     };
-  }, [visibleItems]);
+  }, [supportsWebp, visibleItems]);
 
   const { filterOptions, shouldShowFilter } = useMemo(() => {
     const options = photographers.map((p) => ({
@@ -183,19 +199,27 @@ function GalleryPageInner() {
         ? [{ slug: selectedPhotographer, label: selectedPhotographer }]
         : [];
     const list = [{ slug: "all", label: "All Photographers" }, ...extra, ...options];
-    const showFilter =
+    const baseShowFilter =
       optionSlugs.size > 1 && !(selectedPhotographer !== "all" && optionSlugs.has(selectedPhotographer));
+    const hideForEmptyState =
+      !isLoading && !error && selectedPhotographer === "all" && visibleItems.length === 0;
+    const showFilter = baseShowFilter && !hideForEmptyState;
     return { filterOptions: list, shouldShowFilter: showFilter };
-  }, [photographers, selectedPhotographer]);
+  }, [photographers, selectedPhotographer, isLoading, error, visibleItems.length]);
 
-  const photos = visibleItems.map((i) => ({
-    key: i.slug,
-    src: i.urls.thumb as string,
-    width: i.width,
-    height: i.height,
-    largeSrc: i.urls.large as string,
-    caption: i.caption ?? "",
-  }));
+  const photos = visibleItems.map((i) => {
+    const primaryThumb = supportsWebp
+      ? i.urls.thumbWebp ?? i.urls.thumb ?? i.urls.large
+      : i.urls.thumb ?? i.urls.large;
+    return {
+      key: i.slug,
+      src: primaryThumb as string,
+      width: i.width,
+      height: i.height,
+      largeSrc: i.urls.large as string,
+      caption: i.caption ?? "",
+    };
+  });
 
   const handlePhotographerSelect = (slug: string) => {
     const next = slug === "all" ? "all" : slug;

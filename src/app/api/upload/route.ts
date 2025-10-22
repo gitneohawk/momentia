@@ -216,25 +216,31 @@ export async function POST(req: Request) {
 
     // variants
     const ow = meta.width!; const oh = meta.height!;
-    const resize = async (w: number, q: number) => {
-      const width = Math.min(w, ow);
-      const buf = await sharp(src)
-        .resize({ width, withoutEnlargement: true })
-        .jpeg({ quality: q })
-        .toBuffer();
-      const h = Math.round(oh * (width / ow));
-      return { buf, width, height: h };
+    const generateVariant = async (targetWidth: number, format: "jpeg" | "webp", quality: number) => {
+      const width = Math.min(targetWidth, ow);
+      const height = Math.round(oh * (width / ow));
+      const pipeline = sharp(src).resize({ width, withoutEnlargement: true });
+      const buf =
+        format === "jpeg"
+          ? await pipeline.jpeg({ quality }).toBuffer()
+          : await pipeline.webp({ quality, effort: 4 }).toBuffer();
+      return { buf, width, height };
     };
 
-    const thumb = await resize(480, 82);
-    const large = await resize(2048, 88);
+    const thumb = await generateVariant(480, "jpeg", 82);
+    const thumbWebp = await generateVariant(480, "webp", 80);
+    const large = await generateVariant(2048, "jpeg", 88);
 
     const thumbPath = `${PUB_PREFIX}${slug}_480.jpg`;
+    const thumbWebpPath = `${PUB_PREFIX}${slug}_480.webp`;
     const largePath = `${PUB_PREFIX}${slug}_2048.jpg`;
 
     await container
       .getBlockBlobClient(thumbPath)
       .uploadData(thumb.buf, { blobHTTPHeaders: { blobContentType: "image/jpeg" } });
+    await container
+      .getBlockBlobClient(thumbWebpPath)
+      .uploadData(thumbWebp.buf, { blobHTTPHeaders: { blobContentType: "image/webp" } });
     await container
       .getBlockBlobClient(largePath)
       .uploadData(large.buf, { blobHTTPHeaders: { blobContentType: "image/jpeg" } });
@@ -259,6 +265,7 @@ export async function POST(req: Request) {
     await prisma.variant.createMany({
       data: [
         { photoId: photo.id, type: "thumb", width: thumb.width, height: thumb.height, storagePath: thumbPath, bytes: thumb.buf.length },
+        { photoId: photo.id, type: "thumb-webp", width: thumbWebp.width, height: thumbWebp.height, storagePath: thumbWebpPath, bytes: thumbWebp.buf.length },
         { photoId: photo.id, type: "large", width: large.width, height: large.height, storagePath: largePath, bytes: large.buf.length },
       ],
     });

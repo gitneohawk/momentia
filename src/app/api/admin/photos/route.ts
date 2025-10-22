@@ -168,6 +168,7 @@ export async function GET(req: Request) {
     const items = await Promise.all(
       photos.map(async (p) => {
         const thumb = p.variants.find((v) => v.type === "thumb");
+        const thumbWebp = p.variants.find((v) => v.type === "thumb-webp");
         const large = p.variants.find((v) => v.type === "large");
         return {
           slug: p.slug,
@@ -191,6 +192,7 @@ export async function GET(req: Request) {
             : null,
           urls: {
             original: await getSignedUrl(p.storagePath),
+            thumbWebp: thumbWebp ? await getSignedUrl(thumbWebp.storagePath) : null,
             thumb: thumb ? await getSignedUrl(thumb.storagePath) : null,
             large: large ? await getSignedUrl(large.storagePath) : null,
           },
