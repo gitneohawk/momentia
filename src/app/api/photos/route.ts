@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma, Variant, Keyword } from "@prisma/client";
+import type { Prisma, Variant, Keyword, OrderStatus } from "@prisma/client";
 import {
   StorageSharedKeyCredential,
   BlobSASPermissions,
@@ -273,7 +273,7 @@ export async function GET(req: Request) {
 
   try {
     if (wantFeatured && !q && !kw) {
-      const salesStatuses = ["paid", "processing", "shipped"] as const;
+      const salesStatuses: OrderStatus[] = ["paid", "processing", "shipped"];
       const aggregates = await prisma.order.groupBy({
         by: ["slug"],
         where: {
