@@ -55,9 +55,18 @@ export default function PrivacyPage() {
 
         <article className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-neutral-900">Cookie・解析ツール</h2>
-          <p className="mt-3 text-sm text-neutral-700">
-            当サービスでは、利便性向上や利用状況の把握のために Cookie やアクセス解析ツールを利用する場合があります。
-          </p>
+          <div className="mt-3 space-y-3 text-sm text-neutral-700">
+            <p>
+              当サービスでは、利用状況の把握とサービス改善のために Google Analytics 4 を利用し、Cookie を通じて匿名化されたトラフィックデータを収集します。取得したデータは統計的な分析のみに使用し、個人を特定する情報と紐づけることはありません。
+            </p>
+            <p>
+              Cookie の利用に同意した場合のみ解析タグが有効になります。ページ下部の同意バナーで「同意しない」を選択、またはブラウザ設定で Cookie を無効化することで収集を停止できます。加えて、
+              <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" className="underline">
+                Google が提供するオプトアウトアドオン
+              </a>
+              を利用することでも計測を無効化できます。
+            </p>
+          </div>
         </article>
 
         <article className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -83,7 +92,7 @@ export default function PrivacyPage() {
         </article>
       </section>
 
-      <footer className="mt-10 text-xs text-neutral-500">制定日: 2025年9月2日</footer>
+      <footer className="mt-10 text-xs text-neutral-500">制定日: 2025年9月2日 / 最終更新日: 2025年10月22日</footer>
     </main>
   );
 }
