@@ -6,6 +6,7 @@ import { Providers } from "./providers";
 import { Suspense } from "react";
 import AdminMenu from "@/components/AdminMenu";
 import { Inter, Lora } from 'next/font/google' // フォントをインポート
+import AnalyticsConsent from "@/components/AnalyticsConsent";
 
 // フォントの設定
 const inter = Inter({
@@ -58,6 +59,7 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? null;
   return (
     <html lang="ja" className={`${inter.variable} ${lora.variable} antialiased`}>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-neutral-50 text-neutral-900`}>
@@ -99,6 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
           </p>
         </footer>
+        <AnalyticsConsent measurementId={gaMeasurementId} />
         </Providers>
       </body>
     </html>
