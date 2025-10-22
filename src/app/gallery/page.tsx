@@ -74,7 +74,8 @@ function GalleryPageInner() {
     if (typeof window === "undefined") return false;
     try {
       const canvas = document.createElement("canvas");
-      return Boolean(canvas.getContext && canvas.toDataURL && canvas.toDataURL("image/webp").startsWith("data:image/webp"));
+      if (typeof canvas.toDataURL !== "function") return false;
+      return canvas.toDataURL("image/webp").startsWith("data:image/webp");
     } catch {
       return false;
     }
