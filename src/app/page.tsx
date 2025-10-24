@@ -105,6 +105,8 @@ export default async function Home() {
                         sizes="(min-width: 768px) 33vw, 100vw"
                         src={fallbackSrc}
                         alt={p.caption ?? p.slug}
+                        width={p.width || 1200}
+                        height={p.height || 800}
                         className="h-72 md:h-80 w-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
                       />
                     </picture>
