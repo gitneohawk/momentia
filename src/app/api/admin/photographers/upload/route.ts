@@ -5,6 +5,7 @@ import { logger, serializeError } from "@/lib/logger";
 import sharp from "sharp";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getBlobServiceClient } from "@/lib/azure-storage";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,7 +131,24 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, path: key, blobPath: key, slug: photographerSlug ?? undefined });
+    if (photographerSlug) {
+      await prisma.photographer
+        .update({
+          where: { slug: photographerSlug },
+          data: { profileUrl: key },
+        })
+        .catch((err) => {
+          log.warn("Photographer auto-update failed", { slug: photographerSlug, err: serializeError(err) });
+        });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      path: key,
+      blobPath: key,
+      slug: photographerSlug ?? undefined,
+      autoUpdated: Boolean(photographerSlug),
+    });
   } catch (e: any) {
     log.error("Photographer upload failed", { err: serializeError(e) });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
