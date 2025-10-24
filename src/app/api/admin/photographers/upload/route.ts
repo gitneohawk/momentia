@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions, isAdminEmail } from "@/lib/auth";
 import { logger, serializeError } from "@/lib/logger";
 import sharp from "sharp";
-import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { getBlobServiceClient } from "@/lib/azure-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,26 +39,6 @@ function slugify(input: string) {
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-function getBlobService() {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("missing storage connection");
-
-  const map = new Map(
-    conn.split(";").map((part) => {
-      const [k, v] = part.split("=");
-      return [k, v] as [string, string];
-    }),
-  );
-
-  const name = map.get("AccountName") ?? "";
-  const key = map.get("AccountKey") ?? "";
-  const endpoint = map.get("BlobEndpoint") || `https://${name}.blob.core.windows.net`;
-  if (!name || !key) throw new Error("invalid storage connection");
-
-  const cred = new StorageSharedKeyCredential(name, key);
-  return new BlobServiceClient(endpoint, cred);
 }
 
 async function assertAdmin() {
@@ -138,7 +118,7 @@ export async function POST(req: Request) {
     const stamp = Date.now().toString(36);
     const key = `${PREFIX}${stamp}-${baseName}.jpg`;
 
-    const service = getBlobService();
+    const service = getBlobServiceClient();
     const container = service.getContainerClient(CONTAINER);
     await container.createIfNotExists();
 
