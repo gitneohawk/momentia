@@ -16,6 +16,14 @@ type Photographer = {
   contactEmail?: string | null;
 };
 
+function resolveProfileImage(src?: string | null) {
+  if (!src) return null;
+  if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("/api/")) {
+    return src;
+  }
+  return `/api/photographers/image/${src.replace(/^\/+/, "")}`;
+}
+
 async function getPhotographers(): Promise<Photographer[]> {
   try {
     return await prisma.photographer.findMany({
@@ -63,16 +71,18 @@ export default async function PhotographersPage() {
         </header>
 
         <section className="grid gap-6 sm:grid-cols-2">
-          {sorted.map((p) => (
-            <article
-              key={p.id}
-              className="flex h-full flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5"
-            >
+          {sorted.map((p) => {
+            const profileSrc = resolveProfileImage(p.profileUrl);
+            return (
+              <article
+                key={p.id}
+                className="flex h-full flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5"
+              >
               <div className="flex items-start gap-4">
                 <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-neutral-200 ring-1 ring-black/10">
-                  {p.profileUrl ? (
+                  {profileSrc ? (
                     <Image
-                      src={p.profileUrl}
+                      src={profileSrc}
                       alt={p.displayName || p.name}
                       fill
                       className="object-cover"
@@ -124,8 +134,9 @@ export default async function PhotographersPage() {
                   ギャラリーを見る
                 </Link>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
 
           {sorted.length === 0 && (
             <div className="col-span-full rounded-2xl bg-white p-6 text-center text-sm text-neutral-600 ring-1 ring-black/5">
