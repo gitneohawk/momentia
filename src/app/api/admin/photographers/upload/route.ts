@@ -144,7 +144,10 @@ export async function POST(req: Request) {
 
     const blob = container.getBlockBlobClient(key);
     await blob.uploadData(square, {
-      blobHTTPHeaders: { blobContentType: "image/jpeg", cacheControl: "public, max-age=31536000, immutable" },
+      blobHTTPHeaders: {
+        blobContentType: "image/jpeg",
+        blobCacheControl: "public, max-age=31536000, immutable",
+      },
     });
 
     return NextResponse.json({ ok: true, path: key, blobPath: key, slug: photographerSlug ?? undefined });
