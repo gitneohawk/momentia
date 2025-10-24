@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return new NextResponse(
     `User-agent: *
-Disallow: /
+Allow: /
+
+Disallow: /admin/
 
 Sitemap: https://www.momentia.photo/sitemap.xml
 `,
