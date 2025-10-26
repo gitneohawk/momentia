@@ -154,6 +154,15 @@ export default function AdminBlogEdit() {
               テンプレ挿入
             </button>
             <Link
+              href={`/admin/blog/preview/${slug}`}
+              target="_blank"
+              rel="noreferrer"
+              prefetch={false}
+              className="px-3 py-2 rounded border border-neutral-300 hover:bg-neutral-50"
+            >
+              プレビュー
+            </Link>
+            <Link
               href={`/blog/${slug}`}
               target="_blank"
               rel="noreferrer"

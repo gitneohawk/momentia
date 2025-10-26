@@ -112,6 +112,7 @@ export default async function BlogIndexPage({
                     className="w-full h-full object-cover"
                     sizes="(max-width: 768px) 100vw, 50vw"
                     priority={false}
+                    unoptimized
                   />
                 </div>
               ) : (

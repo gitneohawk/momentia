@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import Link from "next/link";
+import { blogMdxComponents } from "@/components/blogMdxComponents";
 
 const formatDate = (d?: Date | null) =>
   d ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" }).format(d) : "—";
@@ -106,8 +107,8 @@ export default async function BlogPostPage({ params }: BlogPageProps) {
         </div>
       </header>
 
-      <div className="prose prose-neutral max-w-none">
-        <MDXRemote source={post.bodyMdx} />
+      <div className="prose prose-neutral max-w-none prose-img:mx-auto prose-img:max-w-3xl prose-img:rounded-3xl">
+        <MDXRemote source={post.bodyMdx} components={blogMdxComponents} />
       </div>
       <hr className="my-12" />
       <nav className="flex justify-between text-sm">
