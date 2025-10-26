@@ -3,9 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions, isAdminEmail } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import sharp from "sharp";
-import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger, serializeError } from "@/lib/logger";
+import { getBlobServiceClient } from "@/lib/azure-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,22 +25,11 @@ function sanitizePart(s: string) {
   return s.replace(/[\r\n]/g, "").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 100);
 }
 
-const CONTAINER = process.env.AZURE_BLOG_CONTAINER || "blog";    // ← ブログ用に別コンテナ推奨
-const PREFIX = "hero/";                                          // 例: hero/xxx.jpg
+const CONTAINER = process.env.AZURE_BLOG_CONTAINER || "blog"; // ← ブログ用に別コンテナ推奨
+const PREFIX = "hero/"; // 例: hero/xxx.jpg
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9\-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
-}
-
-function getBlobService() {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("missing storage connection");
-  const map = new Map(conn.split(";").map(p => [p.split("=")[0], p.split("=")[1]] as [string,string]));
-  const name = map.get("AccountName")!;
-  const key  = map.get("AccountKey")!;
-  const endpoint = map.get("BlobEndpoint") || `https://${name}.blob.core.windows.net`;
-  const cred = new StorageSharedKeyCredential(name, key);
-  return new BlobServiceClient(endpoint, cred);
 }
 
 async function assertAdmin() {
@@ -119,7 +108,7 @@ export async function POST(req: Request) {
     const baseName = sanitizePart((f as File).name.replace(/\.[^.]+$/, ""));
     const key = `${PREFIX}${slugify(baseName)}.jpg`;
 
-    const service = getBlobService();
+    const service = getBlobServiceClient();
     const container = service.getContainerClient(CONTAINER);
     await container.createIfNotExists();
     const blob = container.getBlockBlobClient(key);
