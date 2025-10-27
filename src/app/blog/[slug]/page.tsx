@@ -107,7 +107,7 @@ export default async function BlogPostPage({ params }: BlogPageProps) {
         </div>
       </header>
 
-      <div className="prose prose-neutral max-w-none prose-img:mx-auto prose-img:max-w-3xl prose-img:rounded-3xl">
+      <div className="prose prose-neutral max-w-none prose-img:mx-auto prose-img:max-w-2xl prose-img:rounded-3xl">
         <MDXRemote source={post.bodyMdx} components={blogMdxComponents} />
       </div>
       <hr className="my-12" />

@@ -9,13 +9,13 @@ function classNames(...values: Array<string | undefined | null | false>) {
 function BlogImage(props: ImgProps) {
   const { alt, className, loading, ...rest } = props;
   return (
-    <figure className="my-8 flex flex-col items-center">
+    <figure className="my-10 flex flex-col items-center">
       <img
         {...rest}
         alt={alt ?? ""}
         loading={loading ?? "lazy"}
         className={classNames(
-          "w-full max-w-3xl rounded-3xl shadow-lg ring-1 ring-black/5 object-cover",
+          "w-full max-w-2xl rounded-3xl shadow-lg ring-1 ring-black/5 object-cover",
           className,
         )}
       />
