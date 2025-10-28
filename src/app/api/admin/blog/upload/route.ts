@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger, serializeError } from "@/lib/logger";
 import { getBlobServiceClient } from "@/lib/azure-storage";
+import { createAllowedHosts } from "@/lib/allowedHosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +16,7 @@ const log = logger.child({ module: "api/admin/blog/upload" });
 // --- security constants / helpers ---
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB cap for hero images
 const MIME_ALLOW = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
-const ALLOWED_HOSTS = new Set([
-  "www.momentia.photo",
-  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
-]);
+const ALLOWED_HOSTS = createAllowedHosts();
 const uploadLimiter = createRateLimiter({ prefix: "admin:blog:upload", limit: 20, windowMs: 60_000 });
 
 function sanitizePart(s: string) {

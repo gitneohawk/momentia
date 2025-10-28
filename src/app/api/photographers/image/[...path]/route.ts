@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getBlobServiceClient } from "@/lib/azure-storage";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger, serializeError } from "@/lib/logger";
+import { createAllowedHosts } from "@/lib/allowedHosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,10 +15,7 @@ const imageLimiter = createRateLimiter({
   windowMs: 60_000,
 });
 
-const ALLOWED_HOSTS = new Set([
-  "www.momentia.photo",
-  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
-]);
+const ALLOWED_HOSTS = createAllowedHosts();
 const CONTAINER = process.env.AZURE_PHOTOS_CONTAINER || "photos";
 
 function clientIp(req: Request): string {

@@ -11,13 +11,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 import { createRateLimiter } from "@/lib/rate-limit";
+import { createAllowedHosts } from "@/lib/allowedHosts";
 
 const ADMIN_BLOG_LIMITER = createRateLimiter({ prefix: "admin:blog", limit: 30, windowMs: 60_000 }); // 30 req/min per IP
 const MAX_JSON_BYTES = 64 * 1024; // 64KB
-const ALLOWED_HOSTS = new Set([
-  "www.momentia.photo",
-  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
-]);
+const ALLOWED_HOSTS = createAllowedHosts();
 
 function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";

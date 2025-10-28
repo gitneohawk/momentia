@@ -5,15 +5,13 @@ import { getServerSession } from "next-auth";
 import { authOptions, isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger, serializeError } from "@/lib/logger";
+import { createAllowedHosts } from "@/lib/allowedHosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_JSON_BYTES = 128 * 1024; // 128KB
-const ALLOWED_HOSTS = new Set([
-  "www.momentia.photo",
-  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
-]);
+const ALLOWED_HOSTS = createAllowedHosts();
 const adminBlogLimiter = createRateLimiter({ prefix: "admin:blog:index", limit: 60, windowMs: 60_000 });
 
 function clientIp(req: Request): string {

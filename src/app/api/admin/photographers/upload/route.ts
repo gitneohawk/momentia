@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getBlobServiceClient } from "@/lib/azure-storage";
 import { prisma } from "@/lib/prisma";
+import { createAllowedHosts } from "@/lib/allowedHosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,10 +15,7 @@ const log = logger.child({ module: "api/admin/photographers/upload" });
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB should be more than enough for profile images
 const MIME_ALLOW = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
-const ALLOWED_HOSTS = new Set([
-  "www.momentia.photo",
-  ...(process.env.NEXT_PUBLIC_BASE_URL ? [new URL(process.env.NEXT_PUBLIC_BASE_URL).host] : []),
-]);
+const ALLOWED_HOSTS = createAllowedHosts();
 const uploadLimiter = createRateLimiter({
   prefix: "admin:photographers:upload",
   limit: 30,
