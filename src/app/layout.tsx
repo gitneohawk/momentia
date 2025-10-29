@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import AdminMenu from "@/components/AdminMenu";
 import { Inter, Lora } from 'next/font/google' // フォントをインポート
 import AnalyticsConsent from "@/components/AnalyticsConsent";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 // フォントの設定
 const inter = Inter({
@@ -102,6 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </p>
         </footer>
         <AnalyticsConsent measurementId={gaMeasurementId} />
+        <AnalyticsTracker measurementId={gaMeasurementId} />
         </Providers>
       </body>
     </html>
