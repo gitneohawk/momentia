@@ -103,7 +103,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </p>
         </footer>
         <AnalyticsConsent measurementId={gaMeasurementId} />
-        <AnalyticsTracker measurementId={gaMeasurementId} />
+        <Suspense fallback={null}>
+          <AnalyticsTracker measurementId={gaMeasurementId} />
+        </Suspense>
         </Providers>
       </body>
     </html>
