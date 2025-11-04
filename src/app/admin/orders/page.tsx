@@ -1,7 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
-const prisma = new PrismaClient();
 export const dynamic = "force-dynamic"; // 過剰キャッシュ回避
 
 export default async function OrdersPage() {

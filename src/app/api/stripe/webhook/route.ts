@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { tplOrderDigitalUser, tplOrderPanelUser, tplOrderAdminNotice } from "@/lib/mail-templates";
 import { logger, serializeError } from "@/lib/logger";
@@ -37,7 +37,6 @@ function alreadyProcessed(eventId: string): boolean {
   return false;
 }
 
-const prisma = new PrismaClient();
 export const runtime = "nodejs"; // Edge不可: 署名検証に生ボディが必要
 
 const log = logger.child({ module: "api/stripe-webhook" });

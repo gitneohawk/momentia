@@ -1,12 +1,10 @@
 // src/app/api/admin/orders/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger, serializeError } from "@/lib/logger";
-
-const prisma = new PrismaClient();
 
 export const runtime = "nodejs"; // 明示しておくと安心
 

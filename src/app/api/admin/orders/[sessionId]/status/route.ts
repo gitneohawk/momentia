@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { PrismaClient, OrderStatus } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger, serializeError } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -45,7 +46,6 @@ function validateSessionId(id?: string): boolean {
   return /^[A-Za-z0-9_]+$/.test(id); // Stripe checkout session id like cs_test_...
 }
 
-const prisma = new PrismaClient();
 const log = logger.child({ module: "api/admin/orders/status" });
 
 export async function PUT(
