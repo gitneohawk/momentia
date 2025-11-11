@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PhotoAlbum from "react-photo-album";
+import "react-photo-album/rows.css";
 import Lightbox from "yet-another-react-lightbox";
 import Captions from "yet-another-react-lightbox/plugins/captions";
 import "yet-another-react-lightbox/plugins/captions.css";
