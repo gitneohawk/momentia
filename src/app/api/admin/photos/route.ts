@@ -174,6 +174,7 @@ export async function GET(req: Request) {
           slug: p.slug,
           width: p.width,
           height: p.height,
+          title: p.title ?? null,
           caption: p.caption,
           published: p.published,
           sellDigital: (p as any)?.sellDigital ?? true,

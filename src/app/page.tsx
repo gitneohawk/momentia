@@ -10,6 +10,7 @@ type Item = {
   slug: string;
   width: number;
   height: number;
+  title?: string | null;
   caption: string | null;
   capturedAt: string | null;
   keywords: string[];
@@ -93,7 +94,7 @@ export default async function Home() {
               return (
                 <div key={p.slug} className="w-full md:w-1/3 p-2">
                   <Link
-                    href={`/gallery?open=${encodeURIComponent(p.slug)}`}
+                    href={`/gallery/${encodeURIComponent(p.slug)}`}
                     prefetch={false}
                     className="group relative block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 hover:shadow-xl transition-shadow duration-300"
                   >
@@ -116,7 +117,7 @@ export default async function Home() {
                     <div className="absolute inset-x-0 bottom-0 p-4 text-white">
                       {/* ホバーでキャプションが浮き上がるアニメーション */}
                       <div className="transform transition-transform duration-500 ease-in-out group-hover:-translate-y-2">
-                        <p className="text-lg font-medium drop-shadow-md">{p.caption || "—"}</p>
+                        <p className="text-lg font-medium drop-shadow-md">{p.title || p.caption || "—"}</p>
                         {p.photographer && (
                           <p className="text-xs text-neutral-200/90">
                             {p.photographer.displayName || p.photographer.name}

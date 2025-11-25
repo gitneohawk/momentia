@@ -10,6 +10,7 @@ const log = logger.child({ module: "app/purchase" });
 type Item = {
   slug: string;
   width: number;
+  title?: string | null;
   height: number;
   caption?: string | null;
   keywords: string[];
@@ -150,7 +151,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
           {heroSrc ? (
             <img
               src={heroSrc}
-              alt={item.slug}
+              alt={item.title || item.slug}
               className="w-full h-auto block"
               loading="eager"
               decoding="async"
@@ -165,7 +166,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
         {/* 情報 & CTA */}
         <div className="grid gap-5">
           <div>
-            <h2 className="text-lg font-medium">{item.caption || item.slug}</h2>
+            <h2 className="text-lg font-medium">{item.title || item.caption || item.slug}</h2>
             {item.photographer && (
               <p className="text-sm text-neutral-500">
                 Photographer: {item.photographer.displayName || item.photographer.name}

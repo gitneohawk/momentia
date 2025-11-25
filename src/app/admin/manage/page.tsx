@@ -9,6 +9,7 @@ type Item = {
   slug: string;
   width: number;
   height: number;
+  title?: string | null;
   caption?: string | null;
   keywords: string[];
   published: boolean;
@@ -163,6 +164,20 @@ export default function AdminManagePage() {
       void refresh();
     }
   }, [status, refresh]);
+
+  const saveTitle = async (slug: string, title: string) => {
+    setBusy(slug);
+    const res = await fetch(`/api/admin/photo/${slug}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    setBusy(null);
+    setMsg(res.ok ? "Title saved" : "Title save failed");
+    if (res.ok) {
+      setItems((prev) => prev.map((p) => (p.slug === slug ? { ...p, title } : p)));
+    }
+  };
 
   const saveCaption = async (slug: string, caption: string) => {
     setBusy(slug);
@@ -398,15 +413,33 @@ export default function AdminManagePage() {
                 </label>
               </div>
 
-              <textarea
-                defaultValue={it.caption ?? ""}
-                rows={2}
-                className="w-full border rounded p-2 text-sm"
-                onBlur={(e) => {
-                  const v = e.currentTarget.value;
-                  if (v !== (it.caption ?? "")) saveCaption(it.slug, v);
-                }}
-              />
+              {/* Title */}
+              <div className="grid gap-1">
+                <label className="text-sm text-neutral-600">Title</label>
+                <input
+                  type="text"
+                  defaultValue={it.title ?? ""}
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  onBlur={(e) => {
+                    const v = e.currentTarget.value;
+                    if (v !== (it.title ?? "")) saveTitle(it.slug, v);
+                  }}
+                />
+              </div>
+
+              {/* Caption */}
+              <div className="grid gap-1">
+                <label className="text-sm text-neutral-600">Caption</label>
+                <textarea
+                  defaultValue={it.caption ?? ""}
+                  rows={2}
+                  className="w-full border rounded p-2 text-sm"
+                  onBlur={(e) => {
+                    const v = e.currentTarget.value;
+                    if (v !== (it.caption ?? "")) saveCaption(it.slug, v);
+                  }}
+                />
+              </div>
 
               {/* Photographer selection */}
               <div className="grid gap-1">

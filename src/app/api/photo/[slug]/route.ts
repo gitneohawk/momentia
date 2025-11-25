@@ -74,6 +74,7 @@ export async function GET(
       slug: photo.slug,
       width: photo.width,
       height: photo.height,
+      title: photo.title ?? null,
       caption: photo.caption,
       keywords: photo.keywords.map(k => k.word),
       priceDigitalJPY: photo.priceDigitalJPY ?? 11000,

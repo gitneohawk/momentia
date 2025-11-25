@@ -127,6 +127,7 @@ export async function PATCH(
 
     // Collect scalar updates
     const data: Record<string, any> = {};
+    if (typeof body.title === "string") data.title = body.title;
     if (typeof body.caption === "string") data.caption = body.caption;
     if (typeof body.published === "boolean") data.published = body.published;
     // New: selling flags

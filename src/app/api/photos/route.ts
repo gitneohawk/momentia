@@ -354,6 +354,7 @@ export async function GET(req: Request) {
       slug: p.slug,
       width: thumb ? thumb.width : p.width,
       height: thumb ? thumb.height : p.height,
+      title: p.title ?? null,
       caption: p.caption,
       capturedAt: p.capturedAt,
       keywords: p.keywords.map((k: Keyword) => k.word),

@@ -15,6 +15,7 @@ model Photo {
   width       Int
   height      Int
   capturedAt  DateTime?
+  title       String?
   caption     String?
   exifRaw     Json?
   createdAt   DateTime  @default(now())
