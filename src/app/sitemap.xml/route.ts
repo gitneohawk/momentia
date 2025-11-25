@@ -68,7 +68,33 @@ export async function GET() {
     blogEntries = null;
   }
 
-  const urls = [...staticEntries, ...(blogEntries ?? [])];
+  let photoEntries:
+    | Array<{ loc: string; changefreq: string; priority: string; lastmod: Date }>
+    | null = null;
+
+  try {
+    const photos = await prisma.photo.findMany({
+      where: { published: true },
+      orderBy: { capturedAt: "desc" },
+      select: { slug: true, capturedAt: true },
+      take: 500, // safety guard
+    });
+
+    photoEntries = photos.map((p) => ({
+      loc: `${baseUrl}/gallery/${p.slug}`,
+      changefreq: "weekly",
+      priority: "0.8",
+      lastmod: p.capturedAt ?? now,
+    }));
+  } catch (error) {
+    photoEntries = null;
+  }
+
+  const urls = [
+    ...staticEntries,
+    ...(blogEntries ?? []),
+    ...(photoEntries ?? []),
+  ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
