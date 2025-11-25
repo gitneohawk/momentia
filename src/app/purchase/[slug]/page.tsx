@@ -2,6 +2,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { logger, serializeError } from "@/lib/logger";
+import Link from "next/link";
 
 export const runtime = "nodejs"; // 画像URL直叩きなどサーバフェッチ想定（ページ自体はCSR）
 export const dynamic = "force-dynamic";
@@ -302,12 +303,12 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
     購入手続きへ
   </button>
 
-  <a
+  <Link
     href="/gallery"
     className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm"
   >
     ギャラリーに戻る
-  </a>
+  </Link>
 </div>
 
           {variant === "digital" && (
