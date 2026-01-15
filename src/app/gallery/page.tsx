@@ -328,7 +328,18 @@ function GalleryPageInner() {
             photos={photos.map((p) => ({ src: p.src, width: p.width, height: p.height, key: p.key }))}
             targetRowHeight={rowH}
             rowConstraints={{ minPhotos: 1, maxPhotos: 4 }}
-            onClick={({ index }) => setIndex(index)}
+            onClick={({ index }) => {
+              const item = visibleItems[index];
+              if (!item) return;
+              try {
+                router.push(`/gallery/${item.slug}`);
+              } catch (e) {
+                log.error("Gallery navigation to slug failed", {
+                  slug: item?.slug,
+                  err: serializeError(e),
+                });
+              }
+            }}
             componentsProps={{
               image: {
                 className:
