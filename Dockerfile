@@ -1,7 +1,7 @@
 # 本番環境専用のDockerfile
 
 # ---------- deps ----------
-FROM node:22-alpine AS deps
+FROM node:22.22.0-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package*.json ./
@@ -9,7 +9,7 @@ COPY .npmrc .npmrc
 RUN npm ci --ignore-scripts
 
 # ---------- builder ----------
-FROM node:22-alpine AS builder
+FROM node:22.22.0-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
@@ -18,7 +18,7 @@ RUN npx prisma generate --schema prisma/schema.prisma
 RUN npm run build
 
 # ---------- runner ----------
-FROM node:22-alpine AS runner
+FROM node:22.22.0-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache \
   libc6-compat \

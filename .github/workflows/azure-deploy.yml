@@ -36,10 +36,10 @@ jobs:
           az extension add -n containerapp --upgrade
           az provider register -n Microsoft.App || true
 
-      - name: Use Node.js 22
+      - name: Use Node.js 22.22.0
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.22.0
 
       - name: Prisma migrate deploy (PROD)
         env:
