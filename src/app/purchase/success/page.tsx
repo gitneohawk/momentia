@@ -14,6 +14,7 @@ type OrderSummary = {
   amountJpy: number | null;
   currency: string | null;
   downloadToken?: string | null;
+  metadata?: { [key: string]: unknown } | null;
 };
 
 // searchParams から文字列を安全に取得
@@ -50,6 +51,7 @@ export default async function PurchaseSuccessPage({
         amountJpy: true,
         currency: true,
         downloadToken: true,
+        metadata: true,
       },
     })) as OrderSummary | null;
   }
@@ -60,6 +62,11 @@ export default async function PurchaseSuccessPage({
 
   const formatJPY = (v: number | null | undefined) =>
     v == null ? "-" : new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(v);
+
+  const panelSize =
+    order?.itemType === "panel" && typeof order.metadata?.size === "string"
+      ? order.metadata.size
+      : null;
 
   return (
     <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 grid gap-6">
@@ -83,6 +90,13 @@ export default async function PurchaseSuccessPage({
 
             <div className="text-neutral-500">種類</div>
             <div>{order.itemType ?? "-"}</div>
+
+            {order.itemType === "panel" && (
+              <>
+                <div className="text-neutral-500">サイズ</div>
+                <div>{panelSize ?? "-"}</div>
+              </>
+            )}
 
             <div className="text-neutral-500">金額</div>
             <div>
