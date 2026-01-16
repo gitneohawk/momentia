@@ -7,9 +7,9 @@ export default function PurchaseInfo() {
         <br className="hidden sm:block" />
         <span className="text-sm text-gray-500">※ 現在は日本国内のお客さまのみご購入いただけます。</span>
       </p>
-      <h2 className="text-xl font-semibold mb-2">高品質プリント（A2パネル）</h2>
+      <h2 className="text-xl font-semibold mb-2">高品質プリント（A4/A3/A2パネル）</h2>
       <div className="mb-6 text-gray-700 space-y-1">
-        <p>A2サイズのグロッシー用紙を使ったプロラボ仕上げのプリントを白パネル加工でお届けします。</p>
+        <p>A4/A3/A2サイズのグロッシー用紙を使ったプロラボ仕上げのプリントを白パネル加工でお届けします。</p>
         <p>ご注文後に発注するため、発送までに約14日程度かかります。</p>
         <p>価格は送料込み・税込となります。額装は含まれません。</p>
       </div>

@@ -19,6 +19,7 @@ import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/prisma';
 import { createRateLimiter } from '@/lib/rate-limit';
 import { logger, serializeError } from "@/lib/logger";
+import { PANEL_PRICES_JPY, type PanelSize } from "@/lib/pricing";
 
 const checkoutLimiter = createRateLimiter({ prefix: 'checkout', limit: 60, windowMs: 60_000 });
 const log = logger.child({ module: "api/checkout" });
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { itemType, slug, customerEmail } = body;
+    const { itemType, slug, customerEmail, size } = body;
     const clientAmount = Number(body?.amountJpy);
     let { name } = body;
 
@@ -121,6 +122,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid baseUrl' }, { status: 400 });
     }
 
+    let panelSize: PanelSize | null = null;
+    if (itemType === "panel") {
+      if (typeof size !== "string" || !(size in PANEL_PRICES_JPY)) {
+        return NextResponse.json({ error: "invalid size" }, { status: 400 });
+      }
+      panelSize = size as PanelSize;
+    }
+
     const photo = await prisma.photo.findUnique({
       where: { slug: safeSlug, published: true },
       select: {
@@ -135,7 +144,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'not found' }, { status: 404 });
     }
 
-    const priceFromDb = itemType === 'digital' ? photo.priceDigitalJPY : photo.pricePrintA2JPY;
+    const panelPrice =
+      panelSize === "A2" && Number.isFinite(photo.pricePrintA2JPY) && (photo.pricePrintA2JPY ?? 0) > 0
+        ? photo.pricePrintA2JPY
+        : panelSize
+          ? PANEL_PRICES_JPY[panelSize]
+          : null;
+    const priceFromDb = itemType === 'digital' ? photo.priceDigitalJPY : panelPrice;
     if (priceFromDb == null || !Number.isFinite(priceFromDb) || priceFromDb <= 0) {
       return NextResponse.json({ error: 'price unavailable' }, { status: 400 });
     }
@@ -182,6 +197,7 @@ export async function POST(req: NextRequest) {
         itemType,
         name: productName,
         ...(safeSlug ? { slug: safeSlug } : {}),
+        ...(panelSize ? { size: panelSize } : {}),
       },
       ...(itemType === 'panel'
         ? { shipping_address_collection: { allowed_countries: ['JP'] } }

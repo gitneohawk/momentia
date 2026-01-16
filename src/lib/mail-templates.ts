@@ -72,16 +72,19 @@ export function tplOrderDigitalUser(params: {
   slug: string;
   downloadUrl: string;
   price: number;
+  kindLabel?: string;
   orderId?: string;
   invoiceUrl?: string; // optional: invoice PDF link
 }) {
-  const { title, downloadUrl, price, orderId, invoiceUrl } = params;
+  const { title, downloadUrl, price, orderId, invoiceUrl, kindLabel } = params;
+  const label = kindLabel ?? "デジタル（商用可）";
   const url = buildDownloadUrl(downloadUrl);
   const inv = normalizeUrl(invoiceUrl);
   const subject = `【Momentia】デジタル画像のダウンロード方法${orderId ? `（注文番号: ${orderId}）` : ""}`;
 
   const text = `この度はご購入ありがとうございます。
 商品: ${title}
+ご購入内容: ${label}
 注文番号: ${orderId ?? "-"}
 金額: ${fmtJPY(price)}
 ダウンロードURL: ${url}
@@ -92,6 +95,7 @@ ${inv ? `領収書PDF: ${inv}\n` : ""}${brandFooterText}`;
   const html = `
   <p>この度はご購入ありがとうございます。</p>
   <p><b>商品:</b> ${title}<br/>
+     <b>ご購入内容:</b> ${label}<br/>
      <b>注文番号:</b> ${orderId ?? "-"}<br/>
      <b>金額:</b> ${fmtJPY(price)}</p>
   <p><a href="${url}">ダウンロードはこちら</a><br/>
@@ -111,15 +115,19 @@ export function tplOrderPanelUser(params: {
   title: string;
   price: number;
   eta: string;
+  size?: string | null;
   orderId?: string;
   invoiceUrl?: string; // optional: invoice PDF link
 }) {
-  const { title, price, eta, orderId, invoiceUrl } = params;
+  const { title, price, eta, orderId, invoiceUrl, size } = params;
+  const sizeLabel = size ?? "-";
   const inv = normalizeUrl(invoiceUrl);
   const subject = `【Momentia】パネルご注文を受け付けました${orderId ? `（注文番号: ${orderId}）` : ""}`;
 
   const text = `この度はご注文ありがとうございます。
 商品: ${title}
+ご購入内容: パネルプリント
+サイズ: ${sizeLabel}
 注文番号: ${orderId ?? "-"}
 金額: ${fmtJPY(price)}
 出荷目安: ${eta}
@@ -129,6 +137,8 @@ ${inv ? `領収書PDF: ${inv}\n` : ""}${brandFooterText}`;
   const html = `
   <p>この度はご注文ありがとうございます。</p>
   <p><b>商品:</b> ${title}<br/>
+     <b>ご購入内容:</b> パネルプリント<br/>
+     <b>サイズ:</b> ${sizeLabel}<br/>
      <b>注文番号:</b> ${orderId ?? "-"}<br/>
      <b>金額:</b> ${fmtJPY(price)}<br/>
      <b>出荷目安:</b> ${eta}</p>
@@ -146,28 +156,33 @@ export function tplOrderAdminNotice(params: {
   slug: string;
   email: string;
   amount: number;
+  size?: string | null;
   orderId?: string;
   invoiceUrl?: string; // optional
 }) {
-  const { kind, title, slug, email, amount, orderId, invoiceUrl } = params;
+  const { kind, title, slug, email, amount, orderId, invoiceUrl, size } = params;
   const inv = normalizeUrl(invoiceUrl);
   const subject = `【注文通知】${title} / ${kind} / ${fmtJPY(amount)}${orderId ? ` / #${orderId}` : ""}`;
 
   const text = `新規注文
-種別: ${kind}
-商品: ${title} (${slug})
-購入者: ${email}
-金額: ${fmtJPY(amount)}
-注文番号: ${orderId ?? "-"}
+Kind: ${kind}
+Title: ${title}
+Slug: ${slug}
+Email: ${email}
+Size: ${size ?? "-"}
+Amount: ${fmtJPY(amount)}
+OrderId: ${orderId ?? "-"}
 ${inv ? `Invoice URL: ${inv}\n` : ""}${brandFooterText}`;
 
   const html = `<p>新規注文がありました。</p>
   <ul>
-    <li>種別: ${kind}</li>
-    <li>商品: ${title} (${slug})</li>
-    <li>購入者: <a href="mailto:${email}">${email}</a></li>
-    <li>注文番号: ${orderId ?? "-"}</li>
-    <li>金額: ${fmtJPY(amount)}</li>
+    <li>Kind: ${kind}</li>
+    <li>Title: ${title}</li>
+    <li>Slug: ${slug}</li>
+    <li>Email: <a href="mailto:${email}">${email}</a></li>
+    <li>Size: ${size ?? "-"}</li>
+    <li>Amount: ${fmtJPY(amount)}</li>
+    <li>OrderId: ${orderId ?? "-"}</li>
   </ul>
   ${inv ? `<p>Invoice URL: <a href="${inv}">${inv}</a></p>` : ""}
   ${brandFooterHtml}`;

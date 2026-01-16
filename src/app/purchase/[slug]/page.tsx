@@ -1,7 +1,7 @@
-// src/app/purchase/[slug]/page.tsx
 "use client";
 import React, { useEffect, useState } from "react";
 import { logger, serializeError } from "@/lib/logger";
+import { PANEL_PRICES_JPY, PANEL_SIZES, type PanelSize } from "@/lib/pricing";
 import Link from "next/link";
 
 export const runtime = "nodejs"; // 画像URL直叩きなどサーバフェッチ想定（ページ自体はCSR）
@@ -35,9 +35,11 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
 
-  const [variant, setVariant] = useState<"digital" | "print_a2">("digital");
+  const [variant, setVariant] = useState<"digital" | "panel">("digital");
+  const [size, setSize] = useState<PanelSize>("A3");
   const priceDigital = item?.priceDigitalJPY ?? 11000; // fallback to 10,000 JPY
-  const pricePrintA2 = item?.pricePrintA2JPY ?? 55000; // fallback to 50,000 JPY
+  const pricePrintA2 = item?.pricePrintA2JPY ?? PANEL_PRICES_JPY.A2;
+  const panelPrice = size === "A2" ? pricePrintA2 : PANEL_PRICES_JPY[size];
 
   useEffect(() => {
     let mounted = true;
@@ -87,7 +89,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
     const d = flagsProvided ? !!rawD : true;
     const p = flagsProvided ? !!rawP : true;
     if (d && !p) setVariant("digital");
-    else if (!d && p) setVariant("print_a2");
+    else if (!d && p) setVariant("panel");
     // if both true or both false, keep current selection
   }, [item]);
 
@@ -188,15 +190,17 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
             <div className="text-neutral-700">形式: JPEG（sRGB）</div>
             <div className="text-neutral-700">デジタル: 4K相当（約3840px、規約順守のうえ商用利用可）</div>
             <div className="text-neutral-700">想定用途: 個人利用（壁紙等）</div>
-            <div className="text-neutral-700">A2パネル: プロラボで高品質プリントし白枠パネル仕上げ</div>
+            <div className="text-neutral-700">パネル（A4/A3/A2）: プロラボで高品質プリントし白枠パネル仕上げ</div>
             <div className="text-xs text-neutral-500">※ 現在は日本国内のお客さまのみご購入いただけます（海外発送は未対応）。</div>
           </div>
 
           {/* バリアント選択 */}
-          <div className="grid gap-3 pt-2 border-t">
+          <div className="space-y-4 pt-2 border-t">
             {/* 購入者メール（許可されたメールのみ購入可：環境変数 ALLOWED_CHECKOUT_EMAILS） */}
-            <div className="grid gap-1">
-              <label className="text-sm text-neutral-700" htmlFor="checkout-email">メールアドレス</label>
+            <div className="grid gap-2">
+              <label className="text-sm text-neutral-700" htmlFor="checkout-email">
+                メールアドレス
+              </label>
               <input
                 id="checkout-email"
                 type="email"
@@ -207,7 +211,9 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
                 placeholder="you@example.com"
                 className="w-full rounded-xl border px-3 py-2 text-sm"
               />
-              <p className="text-xs text-neutral-500">※ テスト中は許可されたメールアドレスのみ購入可能です。</p>
+              <p className="mt-2 text-xs text-neutral-500 leading-relaxed">
+                ※ テスト中は許可されたメールアドレスのみ購入可能です。
+              </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {canDigital && (
@@ -229,15 +235,15 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
               {canPanel && (
                 <button
                   type="button"
-                  onClick={() => setVariant("print_a2")}
+                  onClick={() => setVariant("panel")}
                   className={`text-left rounded-xl border px-4 py-3 ${
-                    variant === "print_a2" ? "border-black ring-1 ring-black" : "border-neutral-300"
+                    variant === "panel" ? "border-black ring-1 ring-black" : "border-neutral-300"
                   }`}
                 >
-                  <div className="font-medium">A2 プロプリント（パネル）</div>
+                  <div className="font-medium">パネルプリント（A4/A3/A2）</div>
                   <div className="text-sm text-neutral-600">送料込 / 額装なし / 工房プリント</div>
                   <div className="mt-1 text-lg font-semibold">
-                    ¥{pricePrintA2.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（送料込み、税込）</span>
+                    ¥{panelPrice.toLocaleString()} <span className="text-sm text-neutral-500 ml-1">（送料込み、税込）</span>
                   </div>
                 </button>
               )}
@@ -249,15 +255,39 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
               )}
             </div>
 
+            {hasAnyPurchase && variant === "panel" && (
+              <div className="grid gap-2 sm:col-span-2 mt-1">
+                <div className="text-sm text-neutral-700">サイズ</div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {PANEL_SIZES.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSize(s)}
+                      className={`rounded-xl border px-3 py-2 text-sm text-left ${
+                        size === s ? "border-black ring-1 ring-black" : "border-neutral-300"
+                      }`}
+                    >
+                      {s}（¥{PANEL_PRICES_JPY[s].toLocaleString()} 税込）
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {hasAnyPurchase && (
-              <div className="flex items-center justify-between mt-1">
+              <div
+                className={`flex flex-wrap items-baseline justify-between gap-2 ${
+                  variant === "panel" ? "mt-3" : "mt-1"
+                }`}
+              >
                 <div className="text-sm text-neutral-600">
-                  {variant === "digital" ? "デジタルファイルのダウンロード（商用可）" : "A2サイズのプリント・パネルを配送"}
+                  {variant === "digital" ? "デジタルファイルのダウンロード（商用可）" : "選択サイズのプリント・パネルを配送"}
                 </div>
                 <div className="text-2xl font-semibold">
-                  ¥{(variant === "digital" ? priceDigital : pricePrintA2).toLocaleString()}
+                  ¥{(variant === "digital" ? priceDigital : panelPrice).toLocaleString()}
                   <span className="text-sm text-neutral-500 ml-2">
-                    {variant === "print_a2" ? "（送料込み、税込）" : "（税込）"}
+                    {variant === "panel" ? "（送料込み、税込）" : "（税込）"}
                   </span>
                 </div>
               </div>
@@ -273,7 +303,7 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
         alert("メールアドレスを入力してください。");
         return;
       }
-      if ((variant === "digital" && !canDigital) || (variant === "print_a2" && !canPanel)) {
+      if ((variant === "digital" && !canDigital) || (variant === "panel" && !canPanel)) {
         alert("現在このバリアントは購入できません。");
         return;
       }
@@ -284,10 +314,11 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             itemType: variant === "digital" ? "digital" : "panel",
-            name: variant === "digital" ? `${item.slug}（デジタル）` : `${item.slug}（A2パネル）`,
-            amountJpy: variant === "digital" ? priceDigital : pricePrintA2,
+            name: variant === "digital" ? `${item.slug}（デジタル）` : `${item.slug}（パネル ${size}）`,
+            amountJpy: variant === "digital" ? priceDigital : panelPrice,
             slug: item.slug,
             customerEmail: email,
+            ...(variant === "panel" ? { size } : {}),
           }),
         });
         if (!res.ok) throw new Error(`Checkout API error: ${res.status}`);

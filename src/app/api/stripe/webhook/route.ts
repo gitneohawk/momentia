@@ -41,6 +41,27 @@ export const runtime = "nodejs"; // Edge不可: 署名検証に生ボディが�
 
 const log = logger.child({ module: "api/stripe-webhook" });
 
+type OrderSummary = {
+  kind: "digital" | "panel";
+  kindLabel: string;
+  size: string | null;
+  amountJpy: number;
+};
+
+function buildOrderSummary(args: {
+  itemType: "digital" | "panel";
+  amountJpy: number;
+  size?: string | null;
+}): OrderSummary {
+  const { itemType, amountJpy, size } = args;
+  return {
+    kind: itemType,
+    kindLabel: itemType === "panel" ? "パネルプリント" : "デジタル（商用可）",
+    size: itemType === "panel" ? (size ?? null) : null,
+    amountJpy,
+  };
+}
+
 export async function POST(req: Request) {
   // Basic header validations before reading body
   const cl = req.headers.get('content-length');
@@ -107,6 +128,7 @@ export async function POST(req: Request) {
     const itemType = (meta.itemType as "digital" | "panel" | undefined) ?? "unknown";
     const name = meta.name ?? null;
     const slug = meta.slug ?? null;
+    const size = typeof meta.size === "string" ? meta.size : null;
 
     const maskedEmail = maskEmail(email);
     const logBase = {
@@ -122,6 +144,10 @@ export async function POST(req: Request) {
 
     // 金額・種別・商品情報（メタデータ想定: itemType, name, slug）
     const amountJpy = full.amount_total ?? 0; // JPY は最小単位＝円
+    const orderSummary =
+      itemType === "digital" || itemType === "panel"
+        ? buildOrderSummary({ itemType, amountJpy, size })
+        : null;
 
     // 3) DB 保存（upsert）: まず Order を確定し、その DB の id を取得
     let orderRecord: { id: string } | null = null;
@@ -262,7 +288,8 @@ export async function POST(req: Request) {
           title: name ?? "(no title)",
           slug: slug ?? "",
           downloadUrl,
-          price: amountJpy,
+          price: orderSummary?.amountJpy ?? amountJpy,
+          kindLabel: orderSummary?.kindLabel,
           orderId: full.id,
         });
 
@@ -300,7 +327,8 @@ export async function POST(req: Request) {
             title: name ?? "(no title)",
             slug: slug ?? "",
             email,
-            amount: amountJpy,
+            amount: orderSummary?.amountJpy ?? amountJpy,
+            size: orderSummary?.size ?? null,
             orderId: full.id,
           });
           const adminHtml = _invoiceUrl
@@ -327,8 +355,9 @@ export async function POST(req: Request) {
 
         const mail = tplOrderPanelUser({
           title: name ?? "(no title)",
-          price: amountJpy,
+          price: orderSummary?.amountJpy ?? amountJpy,
           eta,
+          size: orderSummary?.size ?? size,
           orderId: full.id,
         });
 
@@ -365,7 +394,8 @@ export async function POST(req: Request) {
             title: name ?? "(no title)",
             slug: slug ?? "",
             email,
-            amount: amountJpy,
+            amount: orderSummary?.amountJpy ?? amountJpy,
+            size: orderSummary?.size ?? size,
             orderId: full.id,
           });
           const adminHtml = _invoiceUrl

@@ -241,17 +241,16 @@ function GalleryPageInner() {
 
   const active = index >= 0 ? visibleItems[index] : null;
   const priceDigital = (active?.priceDigitalJPY ?? 11000) as number;
-  const pricePrintA2 = (active?.pricePrintA2JPY ?? 55000) as number;
 
   const canDigital = active ? (active.sellDigital ?? true) : true;
   const canPanel = active ? (active.sellPanel ?? true) : true;
   const hasAnyPurchase = canDigital || canPanel;
   const purchaseLabel = canDigital && canPanel
-    ? `Purchase ¥${priceDigital.toLocaleString()}（税込） / A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
+    ? "Purchase（データ / パネル A4/A3/A2）"
     : canDigital
       ? `Purchase データ ¥${priceDigital.toLocaleString()}（税込）`
       : canPanel
-        ? `Purchase A2 ¥${pricePrintA2.toLocaleString()}（送料込み、税込）`
+        ? "Purchase パネル（A4/A3/A2）"
         : '';
 
   const wmSrc = (slug: string) => `/api/wm/${encodeURIComponent(slug)}?w=2048`;
