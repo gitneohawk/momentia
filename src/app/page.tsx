@@ -77,6 +77,17 @@ export default async function Home() {
     <main className="bg-neutral-50">
       <Hero />
 
+      <section className="bg-neutral-50 py-4">
+        <div className="mx-auto max-w-4xl px-4 text-center">
+          <Link
+            href="/gallery"
+            className="inline-block text-sm text-neutral-700 hover:text-black underline underline-offset-4"
+          >
+            すべての作品を見る
+          </Link>
+        </div>
+      </section>
+
       {/* Featured Works: ホバーエフェクトとデザインを更新 */}
       <section className="hidden md:block py-6 sm:py-8 bg-white">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
