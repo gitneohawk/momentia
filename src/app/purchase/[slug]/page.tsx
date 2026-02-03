@@ -35,8 +35,8 @@ export default function PurchasePage({ params }: { params: Promise<{ slug: strin
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
 
-  const [variant, setVariant] = useState<"digital" | "panel">("digital");
-  const [size, setSize] = useState<PanelSize>("A3");
+  const [variant, setVariant] = useState<"digital" | "panel">("panel");
+  const [size, setSize] = useState<PanelSize>("A4");
   const priceDigital = item?.priceDigitalJPY ?? 11000; // fallback to 10,000 JPY
   const pricePrintA2 = item?.pricePrintA2JPY ?? PANEL_PRICES_JPY.A2;
   const panelPrice = size === "A2" ? pricePrintA2 : PANEL_PRICES_JPY[size];
