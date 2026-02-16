@@ -17,8 +17,6 @@ const nextConfig: NextConfig = {
   images: {
     // Azurite では next/image の最適化を無効化
     unoptimized: isAzurite,
-    // Next.js 16で必須: 許可する画質のリスト
-    qualities: [75, 80, 85, 90, 95],
     remotePatterns: [
       // 開発（Azurite）
       { protocol: "http", hostname: "localhost",  port: "10000", pathname: "/devstoreaccount1/photos/**" },
