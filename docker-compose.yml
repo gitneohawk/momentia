@@ -23,7 +23,7 @@ services:
 
   # PostgreSQLデータベース
   postgres-1:
-    image: postgres:16
+    image: postgres:16.12
     ports:
       - "5433:5432"
     environment:
