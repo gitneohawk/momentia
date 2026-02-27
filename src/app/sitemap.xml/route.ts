@@ -43,6 +43,42 @@ export async function GET() {
       priority: "0.3",
       lastmod: now,
     },
+    {
+      loc: `${baseUrl}/legal/license`,
+      changefreq: "yearly",
+      priority: "0.2",
+      lastmod: now,
+    },
+    {
+      loc: `${baseUrl}/legal/terms`,
+      changefreq: "yearly",
+      priority: "0.2",
+      lastmod: now,
+    },
+    {
+      loc: `${baseUrl}/legal/privacy`,
+      changefreq: "yearly",
+      priority: "0.2",
+      lastmod: now,
+    },
+    {
+      loc: `${baseUrl}/legal/tokusho`,
+      changefreq: "yearly",
+      priority: "0.2",
+      lastmod: now,
+    },
+    {
+      loc: `${baseUrl}/lp/clinic`,
+      changefreq: "monthly",
+      priority: "0.5",
+      lastmod: now,
+    },
+    {
+      loc: `${baseUrl}/purchase/info`,
+      changefreq: "monthly",
+      priority: "0.3",
+      lastmod: now,
+    },
   ];
 
   let blogEntries:
