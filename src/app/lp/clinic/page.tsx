@@ -73,7 +73,7 @@ export default async function DentalLpPage() {
 
   return (
     <main className="bg-neutral-50">
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 lg:py-14 grid gap-8">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 lg:py-14 pb-24 sm:pb-0 grid gap-8">
         <header className="grid gap-4">
           <p className="text-sm sm:text-base font-medium text-neutral-500">
             待合室の数分が、いちばん緊張する。
@@ -128,7 +128,7 @@ export default async function DentalLpPage() {
                 prefetch={false}
                 className="inline-flex w-fit items-center justify-center rounded-full bg-black text-white text-base px-6 py-3 hover:bg-neutral-800 transition"
               >
-                この写真を待合室に使う
+                サイズと価格を見る
               </Link>
             </div>
           </div>
@@ -196,7 +196,7 @@ export default async function DentalLpPage() {
                       prefetch={false}
                       className="inline-flex w-fit items-center justify-center rounded-full bg-black text-white text-sm px-4 py-2.5 hover:bg-neutral-800 transition"
                     >
-                      この写真を待合室に使う
+                      サイズと価格を見る
                     </Link>
                   </div>
                 </article>
@@ -209,6 +209,23 @@ export default async function DentalLpPage() {
           <Link href="/gallery" className="text-sm text-neutral-700 hover:text-black underline underline-offset-4">
             /gallery に戻る
           </Link>
+        </div>
+
+        {/* Mobile sticky CTA (for ad traffic) */}
+        <div className="sm:hidden fixed inset-x-0 bottom-0 z-50 bg-white/90 backdrop-blur border-t border-black/5">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <div className="text-xs leading-tight">
+              <div className="font-medium text-neutral-900">A4 / A3 / A2 写真パネル</div>
+              <div className="text-neutral-600">22,000円〜</div>
+            </div>
+            <Link
+              href={`/purchase/${encodeURIComponent(hero.pick.slug)}`}
+              prefetch={false}
+              className="inline-flex items-center justify-center rounded-full bg-black text-white text-sm px-4 py-2.5 hover:bg-neutral-800 transition whitespace-nowrap"
+            >
+              サイズと価格を見る
+            </Link>
+          </div>
         </div>
       </section>
     </main>
