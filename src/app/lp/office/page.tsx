@@ -134,7 +134,7 @@ export default async function OfficeLpPage() {
           </div>
         </section>
 
-        {/* 5 picks */}
+        {/* 3 picks */}
         <section className="grid gap-4">
           <h2 className="text-lg font-semibold text-neutral-900">用途に合わせて選べる3作品</h2>
 
