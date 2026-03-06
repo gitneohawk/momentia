@@ -70,3 +70,4 @@ prisma/dev.db-journal
 /scripts/
 
 /data/azurite
+backups/
