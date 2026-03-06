@@ -1,7 +1,26 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "オフィス空間のための写真3選 | Momentia",
+  description: "社長室・応接室・会議室。その壁が場の格をつくる。Momentiaが厳選した3作品をご紹介。22,000円〜",
+  openGraph: {
+    title: "オフィス空間のための写真3選 | Momentia",
+    description: "社長室・応接室・会議室。その壁が場の格をつくる。Momentiaが厳選した3作品をご紹介。",
+    type: "website",
+    url: "https://www.momentia.photo/lp/office",
+    images: [{ url: "/api/wm/momentia-48", width: 1200, height: 630, alt: "Path Into Quiet — Momentia" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "オフィス空間のための写真3選 | Momentia",
+    description: "社長室・応接室・会議室。その壁が場の格をつくる。Momentiaが厳選した3作品をご紹介。",
+    images: ["/api/wm/momentia-48"],
+  },
+};
 
 type Item = {
   slug: string;

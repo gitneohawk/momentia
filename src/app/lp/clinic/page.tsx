@@ -1,7 +1,26 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "クリニック待合室のための写真3選 | Momentia",
+  description: "待合室の数分が、いちばん緊張する。視線を静かに逃がす写真を、3作品だけ厳選。22,000円〜",
+  openGraph: {
+    title: "クリニック待合室のための写真3選 | Momentia",
+    description: "待合室の数分が、いちばん緊張する。視線を静かに逃がす写真を、3作品だけ厳選。",
+    type: "website",
+    url: "https://www.momentia.photo/lp/clinic",
+    images: [{ url: "/api/wm/momentia-67", width: 1200, height: 630, alt: "Half Moon, Quiet Sky — Momentia" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "クリニック待合室のための写真3選 | Momentia",
+    description: "待合室の数分が、いちばん緊張する。視線を静かに逃がす写真を、3作品だけ厳選。",
+    images: ["/api/wm/momentia-67"],
+  },
+};
 
 type Item = {
   slug: string;
