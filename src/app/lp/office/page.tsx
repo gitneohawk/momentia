@@ -17,29 +17,19 @@ type Item = {
 
 const PICKS = [
   {
+    slug: "momentia-48",
+    reason: "暖色の木漏れ日と奥へ続く道が、「先を見通す視座」を静かに連想させる。社長室・応接室・会議室のいずれにも馴染み、無彩色になりがちなオフィス空間に温かみと奥行きを加える一枚。",
+    tags: ["社長室", "応接室", "会議室"],
+  },
+  {
     slug: "momentia-46",
-    reason: "「会話を待つ椅子たち」というタイトルが示す通り、応接室・会議室に置いたとき、訪問者の緊張をほぐしながら場の格を高める一枚。",
-    tags: ["応接室", "会議室", "椅子", "静寂"],
+    reason: "「会話を待つ椅子」というタイトルが示す通り、応接室・会議室に置いたとき、訪問者の緊張をほぐしながら場の格を高める一枚。静けさの中に「迎える準備ができている」という空気を醸す。",
+    tags: ["応接室", "会議室"],
   },
   {
-    slug: "momentia-38",
-    reason: "「思考のリズムを静かに並べた本棚」は社長室の知的権威を自然に演出する。過剰な主張がなく、来客に安心感と信頼を与える。",
-    tags: ["社長室", "本棚", "知性", "落ち着き"],
-  },
-  {
-    slug: "momentia-37",
-    reason: "静止した時計が「時間を支配する」という経営者のイメージと重なる。会議室の正面壁など、視線が集まる場所に最適。",
-    tags: ["社長室", "会議室", "時計", "緊張感"],
-  },
-  {
-    slug: "momentia-53",
-    reason: "建築的な格子構造が空へ向かう静かなリズムを描く。企業の秩序・上昇感・誠実さを空間に添えるための一枚。",
-    tags: ["応接室", "会議室", "建築", "秩序"],
-  },
-  {
-    slug: "momentia-43",
-    reason: "都市の光と影が交差する線は、ビジネス空間の洗練されたアクセントになる。モノクロに近い色調がどんな内装にも馴染む。",
-    tags: ["応接室", "社長室", "都市", "モノクロ調"],
+    slug: "momentia-54",
+    reason: "力強い直線と遠近感が「目標に向かう意志」を感じさせる。会議室の正面壁に掛ければ、議論に方向性と推進力を与える。社長室にも、決断のエネルギーを静かに添える一枚。",
+    tags: ["会議室", "社長室"],
   },
 ] as const;
 
@@ -72,7 +62,7 @@ export default async function OfficeLpPage() {
   const isProd = process.env.NODE_ENV === "production";
   const results = await Promise.all(PICKS.map((pick) => fetchPick(pick, baseUrl)));
 
-  const hero = results.find((r) => r.pick.slug === "momentia-46") ?? results[0];
+  const hero = results.find((r) => r.pick.slug === "momentia-48") ?? results[0];
   const heroTitle = hero?.item?.title || hero?.item?.caption || hero?.pick.slug;
   const heroImgSrc =
     hero?.item?.urls.thumbWebp ??
@@ -89,7 +79,7 @@ export default async function OfficeLpPage() {
             社長室・応接室・会議室。その壁が、場の格をつくる。
           </p>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            オフィス空間のための5作品
+            オフィス空間のための3作品
           </h1>
           <p className="text-base text-neutral-600 leading-relaxed max-w-3xl">
             初めて訪れるクライアントが部屋に入った瞬間、壁に飾られた一枚が場の印象を決めます。
@@ -97,7 +87,7 @@ export default async function OfficeLpPage() {
             <br />
             <br />
             このページでは、社長室・応接室・会議室という用途を念頭に、
-            「主張しすぎず、しかし確かな存在感を放つ」5作品だけを選定しています。
+            「主張しすぎず、しかし確かな存在感を放つ」3作品だけを選定しています。
           </p>
         </header>
 
@@ -130,8 +120,8 @@ export default async function OfficeLpPage() {
               <div className="text-sm text-neutral-500">代表作品</div>
               <div className="text-lg sm:text-xl font-semibold text-neutral-900">{heroTitle}</div>
               <p className="text-base text-neutral-600 leading-relaxed">
-                応接室・会議室に最もなじむ一枚から。
-                「会話を待つ椅子」という静けさが、訪問者の緊張をほぐしながら場の格を静かに高めます。
+                まずは、どのオフィス空間にも最もニュートラルに馴染む一枚から。
+                暖色の自然光が空間の緊張を和らげながら、「先を見通す」静かな格を壁に与えます。
               </p>
               <Link
                 href={`/purchase/${encodeURIComponent(hero.pick.slug)}`}
@@ -146,9 +136,9 @@ export default async function OfficeLpPage() {
 
         {/* 5 picks */}
         <section className="grid gap-4">
-          <h2 className="text-lg font-semibold text-neutral-900">用途に合わせて選べる5作品</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">用途に合わせて選べる3作品</h2>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             {results.map(({ pick, item, error }) => {
               const title = item?.title || item?.caption || pick.slug;
               const imgSrc =
