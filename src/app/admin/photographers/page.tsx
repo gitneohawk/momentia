@@ -2,18 +2,21 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 export const metadata = { title: "Admin / Photographers" };
+export const dynamic = "force-dynamic";
 
 export default async function AdminPhotographersPage() {
-  const photographers = await prisma.photographer.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      displayName: true,
-      createdAt: true,
-    },
-  });
+  const photographers = process.env.DATABASE_URL?.trim()
+    ? await prisma.photographer.findMany({
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          displayName: true,
+          createdAt: true,
+        },
+      })
+    : [];
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
