@@ -55,6 +55,18 @@ export default async function BlogIndexPage({
 }) {
   const sp = await searchParams;
   const perPage = 10;
+  const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
+
+  if (!hasDatabaseUrl) {
+    return (
+      <div className="px-4 sm:px-6 max-w-6xl mx-auto py-10">
+        <h1 className="text-3xl font-semibold mb-6">Blog</h1>
+        <div className="rounded-2xl border bg-white p-6 text-sm text-neutral-600">
+          記事はまだありません。
+        </div>
+      </div>
+    );
+  }
 
   // total count first
   const totalCount = await prisma.post.count({

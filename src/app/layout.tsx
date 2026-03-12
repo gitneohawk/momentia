@@ -22,13 +22,13 @@ const lora = Lora({
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-const _base = process.env.NEXT_PUBLIC_BASE_URL;
+const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://www.momentia.photo";
 const siteTitle = "Momentia - 光と時間の呼吸を、そっと壁に。";
 const siteDescription =
   "Momentiaは、光と時間をテーマにした写真レーベル。静かな空間に合うアート写真を、デジタルデータと壁面パネルで販売しています。静けさを連れてくる作品をお届けします。";
 const ogImage = "/ogp.jpg";
 export const metadata: Metadata = {
-  ...(_base ? { metadataBase: new URL(_base) } : {}),
+  metadataBase: new URL(siteUrl),
   title: siteTitle,
   description: siteDescription,
   openGraph: {

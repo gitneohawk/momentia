@@ -25,6 +25,10 @@ function resolveProfileImage(src?: string | null) {
 }
 
 async function getPhotographers(): Promise<Photographer[]> {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return [];
+  }
+
   try {
     return await prisma.photographer.findMany({
       orderBy: { createdAt: "desc" },

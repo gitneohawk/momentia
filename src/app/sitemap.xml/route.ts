@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const baseUrl = "https://www.momentia.photo";
   const now = new Date();
+  const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
 
   const staticEntries = [
     {
@@ -85,45 +86,49 @@ export async function GET() {
     | Array<{ loc: string; changefreq: string; priority: string; lastmod: Date }>
     | null = null;
 
-  try {
-    const posts = await prisma.post.findMany({
-      where: { published: true },
-      orderBy: { publishedAt: "desc" },
-      select: { slug: true, updatedAt: true, publishedAt: true },
-      take: 200, // safety guard
-    });
+  if (hasDatabaseUrl) {
+    try {
+      const posts = await prisma.post.findMany({
+        where: { published: true },
+        orderBy: { publishedAt: "desc" },
+        select: { slug: true, updatedAt: true, publishedAt: true },
+        take: 200, // safety guard
+      });
 
-    blogEntries = posts.map((post) => ({
-      loc: `${baseUrl}/blog/${post.slug}`,
-      changefreq: "weekly",
-      priority: "0.6",
-      lastmod: post.updatedAt ?? post.publishedAt ?? new Date(),
-    }));
-  } catch (error) {
-    // 失敗しても静的ページだけ返せるようにする
-    blogEntries = null;
+      blogEntries = posts.map((post) => ({
+        loc: `${baseUrl}/blog/${post.slug}`,
+        changefreq: "weekly",
+        priority: "0.6",
+        lastmod: post.updatedAt ?? post.publishedAt ?? new Date(),
+      }));
+    } catch {
+      // 失敗しても静的ページだけ返せるようにする
+      blogEntries = null;
+    }
   }
 
   let photoEntries:
     | Array<{ loc: string; changefreq: string; priority: string; lastmod: Date }>
     | null = null;
 
-  try {
-    const photos = await prisma.photo.findMany({
-      where: { published: true },
-      orderBy: { capturedAt: "desc" },
-      select: { slug: true, capturedAt: true },
-      take: 500, // safety guard
-    });
+  if (hasDatabaseUrl) {
+    try {
+      const photos = await prisma.photo.findMany({
+        where: { published: true },
+        orderBy: { capturedAt: "desc" },
+        select: { slug: true, capturedAt: true },
+        take: 500, // safety guard
+      });
 
-    photoEntries = photos.map((p) => ({
-      loc: `${baseUrl}/gallery/${p.slug}`,
-      changefreq: "weekly",
-      priority: "0.8",
-      lastmod: p.capturedAt ?? now,
-    }));
-  } catch (error) {
-    photoEntries = null;
+      photoEntries = photos.map((p) => ({
+        loc: `${baseUrl}/gallery/${p.slug}`,
+        changefreq: "weekly",
+        priority: "0.8",
+        lastmod: p.capturedAt ?? now,
+      }));
+    } catch {
+      photoEntries = null;
+    }
   }
 
   const urls = [

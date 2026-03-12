@@ -28,6 +28,10 @@ interface BlogPageProps {
 }
 
 export async function generateMetadata({ params }: BlogPageProps) {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return {};
+  }
+
   const { slug } = await params;
   const post = await prisma.post.findUnique({
     where: { slug },
@@ -68,6 +72,10 @@ export async function generateMetadata({ params }: BlogPageProps) {
 }
 
 export default async function BlogPostPage({ params }: BlogPageProps) {
+  if (!process.env.DATABASE_URL?.trim()) {
+    notFound();
+  }
+
   const { slug } = await params;
 
   const post = await prisma.post.findUnique({
